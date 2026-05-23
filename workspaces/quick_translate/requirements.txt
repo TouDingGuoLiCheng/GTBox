@@ -1,0 +1,2 @@
+# 内置 Python 取词回退（Rust 使用 --clipboard-only，仅需读剪贴板）
+pyperclip>=1.8.2

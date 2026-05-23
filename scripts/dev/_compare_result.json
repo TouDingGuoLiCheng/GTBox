@@ -1,0 +1,535 @@
+{
+  "summary": {
+    "playlist_raw_lines": 557,
+    "playlist_entries": 554,
+    "playlist_unique_by_song": 537,
+    "playlist_duplicate_groups": 14,
+    "playlist_extra_entries_vs_unique": 17,
+    "downloads_audio_files": 423,
+    "playlist_matched_to_downloads": 0,
+    "playlist_unmatched": 554,
+    "downloads_not_in_playlist": 423,
+    "first_half_vs_second_half_overlap_keys": 12,
+    "first_half_unique_keys": 276,
+    "second_half_unique_keys": 273
+  },
+  "exact_line_duplicates": [],
+  "duplicate_song_groups_sample": [
+    [
+      {
+        "line": 151,
+        "raw": "Merry Christmas Mr. Lawren-坂本龙一"
+      },
+      {
+        "line": 245,
+        "raw": "Merry Christmas Mr. Lawren..-坂本龙一"
+      },
+      {
+        "line": 340,
+        "raw": "Merry Christmas Mr. Lawren…-坂本龙一"
+      },
+      {
+        "line": 341,
+        "raw": "Merry Christmas Mr. Lawren.…-坂本龙一"
+      },
+      {
+        "line": 547,
+        "raw": "坂本龙一-Merry Christmas Mr. Lawren"
+      }
+    ],
+    [
+      {
+        "line": 54,
+        "raw": "Sweet dreams-牛尾憲輔"
+      },
+      {
+        "line": 394,
+        "raw": "牛尾憲輔-Sweet dreams"
+      }
+    ],
+    [
+      {
+        "line": 62,
+        "raw": "Roads to Ride-澤野弘之…"
+      },
+      {
+        "line": 398,
+        "raw": "Roads to Ride-澤野弘之"
+      }
+    ],
+    [
+      {
+        "line": 116,
+        "raw": "Mice On Venus but make it…-RaienZ"
+      },
+      {
+        "line": 414,
+        "raw": "Mice On Venus but make it-RaienZ"
+      }
+    ],
+    [
+      {
+        "line": 118,
+        "raw": "1/6-out of the gravity-東京フィルハーモニー交響楽"
+      },
+      {
+        "line": 416,
+        "raw": "1/6-out of the gravity-東京フィルハーモニー交響楽…"
+      }
+    ],
+    [
+      {
+        "line": 134,
+        "raw": "グランドエスケープ…-三浦透子"
+      },
+      {
+        "line": 424,
+        "raw": "グランドエスケープ-三浦透子"
+      }
+    ],
+    [
+      {
+        "line": 189,
+        "raw": "Spongebob Remix \"Krusty Kr-Eugene The Dream"
+      },
+      {
+        "line": 448,
+        "raw": "Spongebob Remix 'Krusty Kr-Eugene The Dream"
+      }
+    ],
+    [
+      {
+        "line": 191,
+        "raw": "幼女幻奏-Sing,R.Sing"
+      },
+      {
+        "line": 450,
+        "raw": "幼女幻奏-Sing，R.Sing"
+      }
+    ],
+    [
+      {
+        "line": 212,
+        "raw": "ネリヤカナヤ~美ら奄美-ReoNa"
+      },
+      {
+        "line": 457,
+        "raw": "ネリヤカナヤ 美ら奄美-ReoNa"
+      }
+    ],
+    [
+      {
+        "line": 227,
+        "raw": "Ahead of Us-小濑村晶 …"
+      },
+      {
+        "line": 462,
+        "raw": "Ahead of Us-小濑村晶"
+      }
+    ],
+    [
+      {
+        "line": 266,
+        "raw": "曲终奏雅 Tout est bien qui f…-HOYO"
+      },
+      {
+        "line": 495,
+        "raw": "曲终奏雅 Tout est bien qui f.…-HOYO"
+      }
+    ],
+    [
+      {
+        "line": 275,
+        "raw": "开往春天的地铁-风花似雪月"
+      },
+      {
+        "line": 505,
+        "raw": "风花似雪月-开往春天的地铁"
+      }
+    ],
+    [
+      {
+        "line": 327,
+        "raw": "Dear Gogh-小濑村晶"
+      },
+      {
+        "line": 535,
+        "raw": "小濑村晶-Dear Gogh"
+      }
+    ],
+    [
+      {
+        "line": 338,
+        "raw": "Merry Christmas Mr.Lawrenc…-坂本龙一"
+      },
+      {
+        "line": 545,
+        "raw": "Merry Christmas Mr.Lawrenc-坂本龙一"
+      }
+    ]
+  ],
+  "unmatched_playlist_sample": [
+    {
+      "line": 1,
+      "title": "遠空へ",
+      "artist": "市川淳",
+      "raw": "遠空へ-市川淳",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 2,
+      "title": "アンノウン ワールドマップ",
+      "artist": "药师丸悦子",
+      "raw": "アンノウン ワールドマップ-药师丸悦子",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 3,
+      "title": "宮崎誠",
+      "artist": "The Last String",
+      "raw": "宮崎誠-The Last String",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.37
+    },
+    {
+      "line": 4,
+      "title": "白ユキ",
+      "artist": "Milkoi",
+      "raw": "白ユキ-Milkoi",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.3
+    },
+    {
+      "line": 5,
+      "title": "LightDance",
+      "artist": "小濑村晶",
+      "raw": "LightDance-小濑村晶",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.24
+    },
+    {
+      "line": 6,
+      "title": "蚍蜉",
+      "artist": "花粥",
+      "raw": "蚍蜉-花粥",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 7,
+      "title": "Precious",
+      "artist": "小濑村晶",
+      "raw": "Precious-小濑村晶",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.261
+    },
+    {
+      "line": 8,
+      "title": "Bleeding",
+      "artist": "Love",
+      "raw": "Bleeding-Love",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.279
+    },
+    {
+      "line": 9,
+      "title": "MERCILESS",
+      "artist": "KoruSe",
+      "raw": "MERCILESS-KoruSe",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.386
+    },
+    {
+      "line": 10,
+      "title": "小濑村晶/信",
+      "artist": "Theme of Violet Evergarden",
+      "raw": "小濑村晶/信-Theme of Violet Evergarden",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.308
+    },
+    {
+      "line": 11,
+      "title": "Mariana",
+      "artist": "Childs",
+      "raw": "Mariana-Childs",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.417
+    },
+    {
+      "line": 12,
+      "title": "Special",
+      "artist": "Ops",
+      "raw": "Special-Ops",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.192
+    },
+    {
+      "line": 13,
+      "title": "アイドル",
+      "artist": "YOASOBI",
+      "raw": "アイドル-YOASOBI",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.182
+    },
+    {
+      "line": 14,
+      "title": "TIRED OF PROBLEMS",
+      "artist": "NUEKI",
+      "raw": "TIRED OF PROBLEMS-NUEKI",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.323
+    },
+    {
+      "line": 15,
+      "title": "野火 Wildfire",
+      "artist": "HOYO",
+      "raw": "野火 Wildfire-HOYO",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.24
+    },
+    {
+      "line": 16,
+      "title": "洛山",
+      "artist": "陈越龙",
+      "raw": "洛山-陈越龙",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 17,
+      "title": "Little",
+      "artist": "Steps",
+      "raw": "Little-Steps",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.564
+    },
+    {
+      "line": 18,
+      "title": "一斤染",
+      "artist": "无音源",
+      "raw": "一斤染-无音源",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 19,
+      "title": "A Moment Apart",
+      "artist": "Odesza",
+      "raw": "A Moment Apart-Odesza",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.345
+    },
+    {
+      "line": 20,
+      "title": "死在旋转公寓",
+      "artist": "发光曲线",
+      "raw": "死在旋转公寓-发光曲线",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 21,
+      "title": "水泡",
+      "artist": "Forest",
+      "raw": "水泡-Forest",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.316
+    },
+    {
+      "line": 22,
+      "title": "Lazarev-Sunday",
+      "artist": "Mike Lazarev",
+      "raw": "Lazarev-Sunday-Mike Lazarev",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.286
+    },
+    {
+      "line": 23,
+      "title": "Welcome to the jungle",
+      "artist": "ESTi",
+      "raw": "Welcome to the jungle-ESTi",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.371
+    },
+    {
+      "line": 24,
+      "title": "Lifeline",
+      "artist": "Zeraphym",
+      "raw": "Lifeline-Zeraphym",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.234
+    },
+    {
+      "line": 25,
+      "title": "Fallen Down",
+      "artist": "Luke Pickman",
+      "raw": "Fallen Down-Luke Pickman",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.2
+    },
+    {
+      "line": 26,
+      "title": "DoI Matter To Me",
+      "artist": "赵寒",
+      "raw": "DoI Matter To Me-赵寒",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.308
+    },
+    {
+      "line": 27,
+      "title": "The Fading Stories",
+      "artist": "陈致逸",
+      "raw": "The Fading Stories-陈致逸",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.4
+    },
+    {
+      "line": 28,
+      "title": "你要如何，我们就如何",
+      "artist": "康姆士乐团",
+      "raw": "你要如何，我们就如何-康姆士乐团",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 29,
+      "title": "Head in The Giouds",
+      "artist": "Hayd",
+      "raw": "Head in The Giouds-Hayd",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.267
+    },
+    {
+      "line": 30,
+      "title": "生命之名",
+      "artist": "久石让",
+      "raw": "生命之名-久石让",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 31,
+      "title": "みちしるべ",
+      "artist": "茅原实里",
+      "raw": "みちしるべ-茅原实里",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 32,
+      "title": "クルマレ",
+      "artist": "KOKIA",
+      "raw": "クルマレ-KOKIA",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.2
+    },
+    {
+      "line": 33,
+      "title": "空帆船",
+      "artist": "朴树",
+      "raw": "空帆船-朴树",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 34,
+      "title": "新裤子",
+      "artist": "无音源",
+      "raw": "新裤子-无音源",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 35,
+      "title": "FallenF Flowers",
+      "artist": "小濑村晶",
+      "raw": "FallenF Flowers-小濑村晶",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.276
+    },
+    {
+      "line": 36,
+      "title": "送别",
+      "artist": "朴树",
+      "raw": "送别-朴树",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 37,
+      "title": "南山南",
+      "artist": "马頔",
+      "raw": "南山南-马頔",
+      "hint": "",
+      "score": 0.0
+    },
+    {
+      "line": 38,
+      "title": "だんご大家族",
+      "artist": "VISUAL ARTS",
+      "raw": "だんご大家族-VISUAL ARTS",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.444
+    },
+    {
+      "line": 39,
+      "title": "Felicity",
+      "artist": "Isaac Shepard",
+      "raw": "Felicity-Isaac Shepard",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.269
+    },
+    {
+      "line": 40,
+      "title": "Raiden Shugurn Theimie",
+      "artist": "SamuelKim",
+      "raw": "Raiden Shugurn Theimie-SamuelKim",
+      "hint": "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+      "score": 0.234
+    }
+  ],
+  "unmatched_downloads_sample": [
+    "3拍子ラブ-ko-ko-ya_d3htc3hjeGRu.mp3",
+    "44 Seconds Road Movie-SoulFa_dm54ZGRuZGs.mp3",
+    "6moon9 - 可是，妈妈_485021149.mp3",
+    "A DAY OF MARIO-近藤浩治_bWtzY3ZrZA.mp3",
+    "A Mother's Touch-小瀬村晶_bXhoa2Rkdnhr.mp3",
+    "A-39-Water-SHOMDOES_ZGhzdnd4d21j.mp3",
+    "Across The Violet Sky-The Pink Rabbit_bXdobmNja2tk.mp3",
+    "agraph - lit (var)_69107850.mp3",
+    "agraph - sweet devil_280146256.mp3",
+    "agraph - sweet dreams_245629949.mp3",
+    "amplified - MR.RAINDROP_1591159.mp3",
+    "Andrew Prahlow - Outer Wilds_392487745.mp3",
+    "Andrew Prahlow - Travelers' encore_192575433.mp3",
+    "Anson Seabra - Hindenburg Lover_95146921.mp3",
+    "Anson Seabra - Keep Your Head Up Princess_195485637.mp3",
+    "Arte Refact - ごみ箱の底のブレス_51389888.mp3",
+    "AstroNoteS - 満足感_404321781.mp3",
+    "Audio Highs - ヅラじゃない桂だァァ！！_142416314.mp3",
+    "Audio Highs - 余のチャームポイント_142425047.mp3",
+    "Audio Highs - 男子高校生と少年時代_1228778.mp3",
+    "Audio Highs - 糖分とらねぇとなぁー_6522370.mp3",
+    "Audio Highs - 鉄を叩きながら てめーの魂を叩き上げろ_51509962.mp3",
+    "Balmorhea - Remembrance_1503812.mp3",
+    "Banners - Someone To You_250325137.mp3",
+    "Ben Platt - RAIN_75211936.mp3",
+    "BEYOND+-+海阔天空_5886682.mp3",
+    "BillyBiano - もう一度_89567999.mp3",
+    "Binary Haze Interactive&Mili - Harmonious_180535338.mp3",
+    "Bios-澤野弘之_aHd3d25rdmM.mp3",
+    "Broncho - Class Historian_196399900(1).mp3",
+    "Bruno Wen-li - Old Memory_2045536.mp3",
+    "Bruno Wen-li - その日の事_27890970.mp3",
+    "Bruno Wen-li - ヨスガノソラ メインテーマ-遠い空へ-_20271453.mp3",
+    "C-CLAYS - fairy stage_6713462.mp3",
+    "C418 - Living Mice_2632727.mp3",
+    "C418 - Minecraft_25661055.mp3",
+    "CAFé STILE-菊谷知树_eGt2d2hkbW0.mp3",
+    "Candy Wind - 猫的舞步_59173578.mp3",
+    "Changes-Bigubar_Y2NoeG1teGQ.mp3",
+    "Childs - Mariana_1580610.mp3"
+  ]
+}

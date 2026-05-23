@@ -1,0 +1,74 @@
+﻿=== 姝屽崟琛屾暟缁熻 ===
+鍘熷琛屾暟: 558
+鏈夋晥姝屾洸鏉＄洰: 554
+璺宠繃(鏍囬/瀵艰埅琛?: 4
+
+瀹屽叏鐩稿悓鐨勮(閲嶅鏉＄洰): 0 缁?
+
+瑙勮寖鍖栧悗瑙嗕负鍚屼竴棣?鏍囬+姝屾墜): 11 缁? 娑夊強 24 鏉?
+鍘婚噸鍚庡敮涓€姝屾洸绾? 541 棣?
+
+  鍚屾洸涓嶅悓鍐欐硶 (4鏉?:
+    L151: Merry Christmas Mr. Lawren - 鍧傛湰榫欎竴
+    L245: Merry Christmas Mr. Lawren.. - 鍧傛湰榫欎竴
+    L340: Merry Christmas Mr. Lawren鈥?- 鍧傛湰榫欎竴
+    L341: Merry Christmas Mr. Lawren.鈥?- 鍧傛湰榫欎竴
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L62: Roads to Ride - 婢ら噹寮樹箣鈥?
+    L398: Roads to Ride - 婢ら噹寮樹箣
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L116: Mice On Venus but make it鈥?- RaienZ
+    L414: Mice On Venus but make it - RaienZ
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L118: 1/6-out of the gravity - 鏉变含銉曘偅銉儚銉笺儮銉嬨兗浜ら熆妤?
+    L416: 1/6-out of the gravity - 鏉变含銉曘偅銉儚銉笺儮銉嬨兗浜ら熆妤解€?
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L134: 銈般儵銉炽儔銈ㄣ偣銈便兗銉椻€?- 涓夋郸閫忓瓙
+    L424: 銈般儵銉炽儔銈ㄣ偣銈便兗銉?- 涓夋郸閫忓瓙
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L189: Spongebob Remix "Krusty Kr - Eugene The Dream
+    L448: Spongebob Remix 'Krusty Kr - Eugene The Dream
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L191: 骞煎コ骞诲 - Sing,R.Sing
+    L450: 骞煎コ骞诲 - Sing锛孯.Sing
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L212: 銉嶃儶銉ゃ偒銉娿儰~缇庛倝濂勭編 - ReoNa
+    L457: 銉嶃儶銉ゃ偒銉娿儰 缇庛倝濂勭編 - ReoNa
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L227: Ahead of Us - 灏忔繎鏉戞櫠 鈥?
+    L462: Ahead of Us - 灏忔繎鏉戞櫠
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L266: 鏇茬粓濂忛泤 Tout est bien qui f鈥?- HOYO
+    L495: 鏇茬粓濂忛泤 Tout est bien qui f.鈥?- HOYO
+
+  鍚屾洸涓嶅悓鍐欐硶 (2鏉?:
+    L338: Merry Christmas Mr.Lawrenc鈥?- 鍧傛湰榫欎竴
+    L545: Merry Christmas Mr.Lawrenc - 鍧傛湰榫欎竴
+
+=== downloads 鏂囦欢澶?===
+闊抽鏂囦欢鏁? 423
+python : Traceback (most recent call last):
+所在位置 C:\Users\23777\AppData\Local\Temp\ps-script-68f1fc2d-a285-4d11-b72b-c26cb1066626.ps1:89 字符: 52
++ ... ODING='utf-8'; python "d:\VS\工具箱开发\_compare_playlist.py" 2>&1 | Out-F ...
++                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "d:\VS\宸ュ叿绠卞紑鍙慭_compare_playlist.py", line 169, in <module>
+    main()
+  File "d:\VS\宸ュ叿绠卞紑鍙慭_compare_playlist.py", line 142, in main
+    best_i, score = match_entry(e[1], e[2], files_parsed)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\VS\宸ュ叿绠卞紑鍙慭_compare_playlist.py", line 69, in match_entry
+    for fi, (ft, fa) in enumerate(files_parsed):
+            ^^^^^^^^
+ValueError: too many values to unpack (expected 2)

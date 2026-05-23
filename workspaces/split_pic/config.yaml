@@ -1,0 +1,7 @@
+mode: auto
+output_dir: ./output
+target_height: 2200
+max_height: 2800
+overlap: 40
+search_radius: 300
+blank_quantile: 0.2

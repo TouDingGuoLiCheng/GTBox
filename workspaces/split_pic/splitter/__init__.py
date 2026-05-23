@@ -1,0 +1,2 @@
+"""Long screenshot splitter package."""
+

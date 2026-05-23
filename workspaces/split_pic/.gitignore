@@ -1,0 +1,6 @@
+output/
+temp/picked_inputs.txt
+.venv/
+__pycache__/
+*.pyc
+.idea/

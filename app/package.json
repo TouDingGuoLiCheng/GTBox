@@ -1,0 +1,35 @@
+{
+  "name": "app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@fontsource/fusion-pixel-12px-proportional-sc": "^5.2.5",
+    "@fontsource/orbitron": "^5.2.5",
+    "@fontsource/press-start-2p": "^5.2.7",
+    "@iconify/vue": "^5.0.1",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "@vueuse/motion": "^3.0.3",
+    "gifuct-js": "^2.1.2",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.13",
+    "vue-router": "^5.0.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
+}

@@ -1,0 +1,44 @@
+# 独立工程，不纳入本仓库
+quick-translate/
+
+# 依赖与构建产物
+node_modules/
+dist/
+dist-ssr/
+target/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+
+# 本地下载/缓存
+downloads/
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# 环境变量
+.env
+.env.*
+!.env.example

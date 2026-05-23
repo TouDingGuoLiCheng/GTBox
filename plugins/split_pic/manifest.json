@@ -1,0 +1,80 @@
+{
+  "id": "split_pic",
+  "name": "长截图分割",
+  "description": "超长截图切成多张 PNG，输出 part_001.png…，供 OCR 等后续使用",
+  "category": "工具",
+  "icon": "mdi:content-cut",
+  "tags": ["image", "split"],
+  "customRoute": "/tools/split-pic",
+  "script": {
+    "entry": "split_pic/main.py",
+    "interpreter": "venv",
+    "cwd": "split_pic"
+  },
+  "params": [
+    {
+      "name": "input",
+      "label": "图片或文件夹",
+      "type": "folder",
+      "default": "",
+      "flag": "--input"
+    },
+    {
+      "name": "inputsFile",
+      "label": "多选图片列表文件",
+      "type": "string",
+      "default": "",
+      "flag": "--inputs-file"
+    },
+    {
+      "name": "outputDir",
+      "label": "输出目录（相对 split_pic，默认 output）",
+      "type": "string",
+      "default": "output",
+      "flag": "--output-dir"
+    },
+    {
+      "name": "mode",
+      "label": "分割模式",
+      "type": "select",
+      "default": "auto",
+      "flag": "--mode",
+      "options": ["auto", "smart", "fixed"]
+    },
+    {
+      "name": "targetHeight",
+      "label": "智能切目标高度",
+      "type": "number",
+      "default": 2200,
+      "flag": "--target-height"
+    },
+    {
+      "name": "maxHeight",
+      "label": "单张最大高度",
+      "type": "number",
+      "default": 2800,
+      "flag": "--max-height"
+    },
+    {
+      "name": "overlap",
+      "label": "切片重叠像素",
+      "type": "number",
+      "default": 40,
+      "flag": "--overlap"
+    },
+    {
+      "name": "searchRadius",
+      "label": "智能切搜索窗口",
+      "type": "number",
+      "default": 300,
+      "flag": "--search-radius"
+    },
+    {
+      "name": "blankQuantile",
+      "label": "空白候选分位数",
+      "type": "number",
+      "default": 0.2,
+      "flag": "--blank-quantile"
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+/* 像素主题 — 石质面板 / 物品栏式卡片（我的世界 GUI） */
+
+html[data-theme="pixel"] .ui-card {
+  background-color: var(--pixel-stone) !important;
+  border: 2px solid !important;
+  border-color: var(--pixel-border-light) var(--pixel-border-dark) var(--pixel-border-dark)
+    var(--pixel-border-light) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: var(--pixel-text) !important;
+}
+
+html[data-theme="pixel"] .ui-card:hover {
+  filter: brightness(1.04);
+  border-color: var(--pixel-border-light) var(--pixel-border-dark) var(--pixel-border-dark)
+    var(--pixel-border-light) !important;
+}
+
+html[data-theme="pixel"] .ui-bar {
+  background-color: rgb(0 0 0 / 0.45) !important;
+  border-bottom: 2px solid var(--pixel-border-dark) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--pixel-text-on-dark) !important;
+}
+
+html[data-theme="pixel"] .ui-sidebar {
+  background-color: var(--pixel-stone) !important;
+  border-right: 2px solid var(--pixel-border-dark) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="pixel"] .ui-title-block--active {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  backdrop-filter: none !important;
+}
+
+html[data-theme="pixel"] .ui-title {
+  text-shadow: 1px 1px 0 #000 !important;
+  color: var(--pixel-text-on-dark) !important;
+}
+
+html[data-theme="pixel"] .ui-tag {
+  background-color: var(--pixel-slot) !important;
+  border: 2px solid !important;
+  border-color: var(--pixel-border-dark) var(--pixel-border-light) var(--pixel-border-light)
+    var(--pixel-border-dark) !important;
+  color: var(--pixel-text) !important;
+  box-shadow: inset 1px 1px 0 rgb(0 0 0 / 0.35) !important;
+}
+
+html[data-theme="pixel"] .ui-sidebar-btn--active,
+html[data-theme="pixel"] aside button[class*="bg-white"] {
+  background-color: var(--pixel-grass-top) !important;
+  color: var(--pixel-text) !important;
+  border: 2px solid !important;
+  border-color: var(--pixel-border-light) var(--pixel-border-dark) var(--pixel-border-dark)
+    var(--pixel-border-light) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="pixel"] aside button:not([class*="bg-white"]):hover {
+  background-color: var(--pixel-stone-dark) !important;
+  color: var(--pixel-text) !important;
+}
+
+/* 设置页 / 首页内嵌面板（勿匹配创意背景遮罩，避免字符雨层被刷成浅灰） */
+html[data-theme="pixel"] main [class*="bg-surface-elevated"],
+html[data-theme="pixel"] main [class*="bg-black"],
+html[data-theme="pixel"] aside [class*="bg-surface-elevated"],
+html[data-theme="pixel"] aside [class*="bg-black"] {
+  background-color: var(--pixel-stone) !important;
+  color: var(--pixel-text) !important;
+}
+
+html[data-theme="pixel"] .border-border {
+  border-color: var(--pixel-border-dark) !important;
+}
+
+html[data-theme="pixel"] .bg-accent {
+  background-color: var(--pixel-grass-top) !important;
+}
+
+html[data-theme="pixel"] .bg-accent\/8,
+html[data-theme="pixel"] [class*="bg-accent/"] {
+  background-color: color-mix(in srgb, var(--pixel-grass-top) 35%, var(--pixel-stone)) !important;
+}
+
+html[data-theme="pixel"] .border-accent {
+  border-color: #2d6a1f !important;
+}
+
+html[data-theme="pixel"] .hover\:bg-white\/5:hover,
+html[data-theme="pixel"] .hover\:bg-white\/10:hover {
+  background-color: var(--pixel-stone-dark) !important;
+}
+
+html[data-theme="pixel"] .hover\:text-accent:hover {
+  color: #2d6a1f !important;
+}
+
+html[data-theme="pixel"] .ui-bar .hover\:text-accent:hover {
+  color: #ffff55 !important;
+}
+
+/* 顶栏 Logo 方块 */
+html[data-theme="pixel"] .ui-bar span.rounded-lg {
+  background-color: var(--pixel-grass-top) !important;
+  border: 2px solid !important;
+  border-color: var(--pixel-border-light) var(--pixel-border-dark) var(--pixel-border-dark)
+    var(--pixel-border-light) !important;
+  box-shadow: none !important;
+  color: var(--pixel-text) !important;
+}
+
+html[data-theme="pixel"] .ui-bar .text-accent {
+  color: #ffff55 !important;
+}

@@ -1,0 +1,49 @@
+@import "@fontsource/orbitron/700.css";
+
+/* 不用 background-clip:text，避免 WebView2 里只显示色块、文字消失 */
+.app-brand-title {
+  font-family: "Orbitron", "Segoe UI", system-ui, sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  color: #f4f4f5;
+  text-shadow:
+    0 0 14px rgb(34 211 238 / 0.55),
+    0 1px 2px rgb(0 0 0 / 0.45);
+  background: none;
+}
+
+html[data-theme="light"] .app-brand-title {
+  color: #0e7490;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+html[data-theme="pixel"] .app-brand-title {
+  font-family: "Press Start 2P", "Orbitron", cursive;
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: var(--pixel-text-on-dark, #f8fafc);
+  text-shadow: 2px 2px 0 #000;
+}
+
+html[data-theme="galaxy"] .app-brand-title {
+  color: #ede9fe;
+  text-shadow:
+    0 0 16px rgb(167 139 250 / 0.75),
+    0 0 6px rgb(196 181 253 / 0.5),
+    0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+html[data-theme="custom"][data-font-color="dark"] .app-brand-title {
+  color: #0e7490;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.6);
+}
+
+html[data-theme="custom"][data-font-color="light"] .app-brand-title {
+  color: #f4f4f5;
+  text-shadow:
+    0 0 12px rgb(34 211 238 / 0.45),
+    0 1px 2px rgb(0 0 0 / 0.4);
+}

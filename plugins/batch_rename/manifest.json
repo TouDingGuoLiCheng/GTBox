@@ -1,0 +1,78 @@
+{
+  "id": "batch_rename",
+  "name": "批量文件改名",
+  "description": "前缀 + 序号 + 原扩展名；可选递归、排序、接续计数、仅预览",
+  "category": "工具",
+  "icon": "mdi:rename-box",
+  "tags": ["files", "rename"],
+  "customRoute": "/tools/batch-rename",
+  "script": {
+    "entry": "auto_change_file_name/批量文件改名.py",
+    "interpreter": "python",
+    "cwd": "auto_change_file_name"
+  },
+  "params": [
+    {
+      "name": "root",
+      "label": "要改名的根目录",
+      "type": "folder",
+      "default": "",
+      "flag": "--root"
+    },
+    {
+      "name": "prefix",
+      "label": "文件名前缀",
+      "type": "string",
+      "default": "",
+      "flag": "--prefix"
+    },
+    {
+      "name": "width",
+      "label": "序号位数（补零）",
+      "type": "number",
+      "default": 3,
+      "flag": "--width"
+    },
+    {
+      "name": "start",
+      "label": "起始序号（留空则用计数文件接续）",
+      "type": "number",
+      "flag": "--start"
+    },
+    {
+      "name": "counterFile",
+      "label": "计数文件路径（留空用脚本目录下 temp/rename_counter.txt）",
+      "type": "string",
+      "default": "",
+      "flag": "--counter-file"
+    },
+    {
+      "name": "noCounterFile",
+      "label": "不使用计数文件（每次从起始序号或 1 开始）",
+      "type": "boolean",
+      "flag": "--no-counter-file"
+    },
+    {
+      "name": "depth",
+      "label": "扫描范围",
+      "type": "select",
+      "default": "recursive",
+      "flag": "--depth",
+      "options": ["recursive", "top"]
+    },
+    {
+      "name": "order",
+      "label": "编号顺序",
+      "type": "select",
+      "default": "path",
+      "flag": "--order",
+      "options": ["path", "none"]
+    },
+    {
+      "name": "dryRun",
+      "label": "仅预览（不真正改名）",
+      "type": "boolean",
+      "flag": "--dry-run"
+    }
+  ]
+}

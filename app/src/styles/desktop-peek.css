@@ -1,0 +1,17 @@
+/* 透视桌面：仅空白区域透明，不覆盖 .ui-bar / .ui-card 等控件样式 */
+
+html[data-desktop-peek="true"] body {
+  background: transparent !important;
+}
+
+html[data-desktop-peek="true"] #app {
+  background: transparent !important;
+}
+
+html[data-desktop-peek="true"] #app > .relative.flex.h-full {
+  background: transparent !important;
+}
+
+html[data-desktop-peek="true"] #app main {
+  background: transparent !important;
+}

@@ -1,0 +1,110 @@
+source: qq_music_mobile
+
+status_bar_crop:
+  enable: false
+  top_ratio: 0.055
+
+row_y_threshold: 0.012
+row_y_by_box_factor: 0.55
+pair_gap_ratio: 1.9
+align_threshold: 0.15
+title_min_height_ratio: 0.82
+edge_margin_ratio: 0.03
+
+# QQ 音乐列表版面：去掉左侧序号列、右侧按钮列的 OCR 框
+index_column_right_ratio: 0.13
+content_right_max_ratio: 0.76
+
+ui_drop_contains:
+  - 无音源
+  - 相关视频可播
+  - 续费会员
+  - 全部播放
+  - QQ音乐
+  - 我的收藏
+  - 听我想听
+  - 首VIP歌曲
+
+# 按垂直间距切分「歌曲条目」
+entry_split_gap_factor: 1.55
+entry_split_gap_min_px: 28
+
+# 副行（歌手行）特征标记，含这些的不允许作为歌名上行
+artist_line_markers:
+  - VIP
+  - HQ
+  - SQ
+  - MV
+  - 无损
+
+title_hint_tokens:
+  - feat
+  - ver
+  - mix
+  - remix
+  - piano
+  - episode
+
+min_ocr_score: 0.50
+min_pair_score: 0.5
+
+theme: auto
+
+ui_blacklist:
+  - 播放全部
+  - 歌曲
+  - 下载
+  - 已下载
+  - 无损
+  - 更多
+  - VIP
+  - MV
+  - HQ
+  - 推荐
+
+artist_album_separators:
+  - " - "
+  - " – "
+  - " — "
+  - "-"
+
+# 多作者分隔符：只保留第一位（如 Nor/蔚蓝档案 -> Nor）
+artist_multi_separators:
+  - "/"
+  - "、"
+  - "&"
+
+time_patterns:
+  - "^\\d{1,2}:\\d{2}$"
+  - "^\\d{1,4}$"   # 歌单左侧序号（如 319、320）
+  - "^[\\d\\s]+$"
+
+# 写入 songs.txt 前的文本规则（识别阶段仍会框到这些歌）
+strip_parentheses: true   # 去掉 ()（）[]【】 及其中内容
+
+# 两阶段自动检测（extract_playlist_detect.py）横向裁剪参数
+detect_crop_left_ratio: 0.08
+detect_crop_right_ratio: 0.78
+detect_crop_left_expand_ratio: 0.02
+detect_crop_right_expand_ratio: 0.01
+detect_crop_pad_top_ratio: 0.010
+detect_crop_pad_bottom_ratio: 0.004
+detect_crop_pad_top_h_factor: 0.14
+detect_crop_pad_bottom_h_factor: 0.08
+detect_crop_pad_scale: 0.65         # 上下边距缩放，越小越不易带入相邻歌
+
+# Pass1 配对（平衡：少错抠 + 尽量多配对）
+detect_min_ocr_score: 0.50
+detect_pair_gap_ratio: 2.0
+detect_pair_window: 2              # 限制向后看窗口，优先保守判未配对，阻断连锁错位
+detect_pair_max_lookahead: 7
+detect_align_threshold: 0.16
+detect_min_row_height: 8
+detect_min_pair_score: 11.6         # 提高配对门槛，宁可未配对也不串行污染
+detect_title_min_height_ratio: 0.72 # 放宽上/下行框高比例，避免歌名行被误拒
+detect_require_artist_like_bot: false
+detect_relaxed_pair_score: 8.8       # 紧邻且明显像歌手行时的放宽阈值
+detect_relaxed_gap_ratio: 0.72       # 放宽配对时要求更紧的行距
+detect_relaxed_adjacent_only: true   # 只允许和下一行做放宽兜底
+detect_force_mid_truncated_pair: true
+detect_force_mid_gap_ratio: 1.8      # 收紧跨行距兜底，避免首条错后继续错位

@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>长截图自动分割</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+    .container {
+      max-width: 980px;
+      margin: 24px auto;
+      padding: 18px;
+      border: 1px dashed #b9c2cf;
+      background: #fff;
+      min-height: calc(100vh - 48px);
+    }
+    .header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .pick-btn {
+      border: 1px solid #d3d6dd;
+      background: #f7f8fa;
+      padding: 10px 18px;
+      min-width: 220px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 18px;
+      user-select: none;
+    }
+    .meta {
+      color: #666;
+      font-size: 14px;
+    }
+    .build {
+      margin-left: auto;
+      color: #8a909a;
+      font-size: 12px;
+    }
+    .drop-zone {
+      border: 2px dashed #c8ced8;
+      border-radius: 6px;
+      min-height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: #fafbfc;
+      transition: all .15s ease;
+      text-align: center;
+      padding: 24px;
+    }
+    .drop-zone.dragover {
+      border-color: #6f8ed8;
+      background: #eef3ff;
+    }
+    .hint-main {
+      font-size: 22px;
+      color: #4a4f58;
+      margin-bottom: 10px;
+    }
+    .hint-sub {
+      font-size: 16px;
+      color: #717784;
+      line-height: 1.7;
+    }
+    .footer {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 14px;
+    }
+    .start-btn {
+      min-width: 220px;
+      border: 0;
+      background: #5977c9;
+      color: #fff;
+      font-size: 20px;
+      padding: 12px 20px;
+      cursor: pointer;
+    }
+    .start-btn[disabled] {
+      background: #b6bdc9;
+      cursor: not-allowed;
+    }
+    #status {
+      color: #444;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    #files {
+      margin-top: 14px;
+      color: #333;
+      font-size: 14px;
+      width: 100%;
+      max-height: 160px;
+      overflow: auto;
+      text-align: left;
+      border: 1px solid #eceff4;
+      background: #fff;
+      padding: 10px 12px;
+    }
+    #files:empty {
+      display: none;
+    }
+    .settings {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(100px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field label {
+      font-size: 12px;
+      color: #6a6f7a;
+    }
+    .field input,
+    .field select {
+      border: 1px solid #d8dce4;
+      padding: 6px 8px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <label for="picker" class="pick-btn">+ 点此选择图片</label>
+      <input id="picker" type="file" accept=".png,.jpg,.jpeg,.bmp,.webp" multiple hidden />
+      <div class="build">build: {{ build_id }}</div>
+    </div>
+
+    <div class="settings">
+      <div class="field">
+        <label for="mode">mode</label>
+        <select id="mode">
+          <option value="auto" {% if mode == 'auto' %}selected{% endif %}>auto</option>
+          <option value="smart" {% if mode == 'smart' %}selected{% endif %}>smart</option>
+          <option value="fixed" {% if mode == 'fixed' %}selected{% endif %}>fixed</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="targetHeight">target_height</label>
+        <input id="targetHeight" type="number" min="200" step="10" value="{{ target_height }}" />
+      </div>
+      <div class="field">
+        <label for="maxHeight">max_height</label>
+        <input id="maxHeight" type="number" min="200" step="10" value="{{ max_height }}" />
+      </div>
+      <div class="field">
+        <label for="overlap">overlap</label>
+        <input id="overlap" type="number" min="0" step="1" value="{{ overlap }}" />
+      </div>
+      <div class="field">
+        <label for="searchRadius">search_radius</label>
+        <input id="searchRadius" type="number" min="1" step="10" value="{{ search_radius }}" />
+      </div>
+      <div class="field">
+        <label for="blankQuantile">blank_quantile</label>
+        <input id="blankQuantile" type="number" min="0.01" max="0.9" step="0.01" value="{{ blank_quantile }}" />
+      </div>
+    </div>
+
+    <div id="dropZone" class="drop-zone">
+      <div class="hint-main">点击上方按钮选择图片 / 将图片拖入此区域</div>
+      <div class="hint-sub">支持 PNG/JPG/JPEG/BMP/WEBP，处理完成后自动下载 ZIP（含所有切片）</div>
+      <div id="files"></div>
+    </div>
+
+    <div class="footer">
+      <div id="status"></div>
+      <button id="startBtn" class="start-btn" disabled>开始分割</button>
+    </div>
+  </div>
+
+  <script>
+    const picker = document.getElementById("picker");
+    const dropZone = document.getElementById("dropZone");
+    const startBtn = document.getElementById("startBtn");
+    const statusEl = document.getElementById("status");
+    const filesEl = document.getElementById("files");
+    const modeEl = document.getElementById("mode");
+    const targetHeightEl = document.getElementById("targetHeight");
+    const maxHeightEl = document.getElementById("maxHeight");
+    const overlapEl = document.getElementById("overlap");
+    const searchRadiusEl = document.getElementById("searchRadius");
+    const blankQuantileEl = document.getElementById("blankQuantile");
+
+    let selectedFiles = [];
+
+    const toArray = (list) => Array.from(list || []);
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text || "";
+      statusEl.style.color = isError ? "#b41f1f" : "#444";
+    }
+
+    function renderFiles() {
+      if (!selectedFiles.length) {
+        filesEl.innerHTML = "";
+        startBtn.disabled = true;
+        return;
+      }
+      const lines = selectedFiles.map((f, i) => `${i + 1}. ${f.name}`);
+      filesEl.innerHTML = lines.join("<br>");
+      startBtn.disabled = false;
+    }
+
+    function mergeFiles(newFiles) {
+      const map = new Map(selectedFiles.map((f) => [f.name + "_" + f.size, f]));
+      newFiles.forEach((f) => {
+        map.set(f.name + "_" + f.size, f);
+      });
+      selectedFiles = Array.from(map.values());
+      renderFiles();
+    }
+
+    picker.addEventListener("change", (e) => {
+      mergeFiles(toArray(e.target.files));
+    });
+
+    ["dragenter", "dragover"].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove("dragover");
+      });
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      const dropped = toArray(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+      if (!dropped.length) {
+        setStatus("未检测到图片文件。", true);
+        return;
+      }
+      setStatus("");
+      mergeFiles(dropped);
+    });
+
+    async function startSplit() {
+      if (!selectedFiles.length) {
+        setStatus("请先选择图片。", true);
+        return;
+      }
+      startBtn.disabled = true;
+      setStatus("处理中，请稍候...");
+      try {
+        const form = new FormData();
+        selectedFiles.forEach((f) => form.append("images", f));
+        form.append("mode", modeEl.value);
+        form.append("target_height", targetHeightEl.value);
+        form.append("max_height", maxHeightEl.value);
+        form.append("overlap", overlapEl.value);
+        form.append("search_radius", searchRadiusEl.value);
+        form.append("blank_quantile", blankQuantileEl.value);
+
+        const res = await fetch("/api/split", {
+          method: "POST",
+          body: form
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "处理失败");
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "split_result.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        setStatus(`完成：${selectedFiles.length} 张原图已处理，ZIP 已下载。`);
+      } catch (err) {
+        setStatus(`失败：${err.message || err}`, true);
+      } finally {
+        startBtn.disabled = false;
+      }
+    }
+
+    startBtn.addEventListener("click", startSplit);
+  </script>
+</body>
+</html>
+

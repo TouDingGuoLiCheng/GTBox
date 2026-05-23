@@ -1,0 +1,75 @@
+{
+  "id": "playlist_ocr",
+  "name": "歌单截图识别",
+  "description": "从 QQ 音乐歌单截图提取歌名-歌手，输出 songs.txt",
+  "hiddenFromHome": true,
+  "category": "音乐",
+  "icon": "mdi:image-search-outline",
+  "tags": ["ocr", "offline"],
+  "script": {
+    "entry": "playlist_ocr/extract_playlist.py",
+    "interpreter": "venv",
+    "cwd": "playlist_ocr"
+  },
+  "params": [
+    {
+      "name": "input",
+      "label": "截图目录",
+      "type": "folder",
+      "default": "playlist_ocr/images_in",
+      "flag": "--input"
+    },
+    {
+      "name": "output",
+      "label": "songs 输出文件",
+      "type": "string",
+      "default": "songs.txt",
+      "flag": "--output"
+    },
+    {
+      "name": "review",
+      "label": "review 输出文件",
+      "type": "string",
+      "default": "playlist_ocr/songs_review.txt",
+      "flag": "--review"
+    },
+    {
+      "name": "regionsDir",
+      "label": "OCR 框缓存目录",
+      "type": "folder",
+      "default": "playlist_ocr/regions_cache",
+      "flag": "--regions-dir"
+    },
+    {
+      "name": "merge",
+      "label": "合并模式",
+      "type": "select",
+      "default": "overwrite",
+      "flag": "--merge",
+      "options": ["append", "overwrite"]
+    },
+    {
+      "name": "device",
+      "label": "OCR 设备",
+      "type": "select",
+      "default": "auto",
+      "flag": "--device",
+      "options": ["auto", "cpu", "gpu", "gpu:0"]
+    },
+    {
+      "name": "debug",
+      "label": "调试模式",
+      "type": "boolean",
+      "flag": "--debug"
+    },
+    {
+      "name": "tracePairing",
+      "label": "输出配对追踪日志",
+      "type": "boolean",
+      "flag": "--trace-pairing"
+    }
+  ],
+  "outputs": [
+    { "label": "songs.txt", "path": "songs.txt", "action": "open_folder" }
+  ]
+}

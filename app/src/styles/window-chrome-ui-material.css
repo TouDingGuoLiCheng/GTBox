@@ -1,0 +1,14 @@
+/* 无边框窗口：顶栏与窗口控制按钮材质（与 ui-material 联动） */
+.ui-bar .chrome-icon-btn {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+html[data-theme="custom"] .ui-bar .chrome-icon-btn:hover {
+  background-color: rgb(255 255 255 / 0.06);
+}
+
+html[data-theme="galaxy"] .ui-bar .chrome-icon-btn:hover {
+  background-color: rgb(255 255 255 / 0.08);
+}

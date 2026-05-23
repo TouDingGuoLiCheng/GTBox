@@ -1,0 +1,79 @@
+{
+  "id": "full_auto_download",
+  "name": "全自动下载",
+  "description": "读取 songs.txt，自动抓链并下载",
+  "hiddenFromHome": true,
+  "category": "音乐",
+  "icon": "mdi:download-circle-outline",
+  "tags": ["long-task", "download"],
+  "script": {
+    "entry": "full_auto_download_2t58.py",
+    "interpreter": "venv",
+    "cwd": "."
+  },
+  "params": [
+    {
+      "name": "input",
+      "label": "输入 songs 文件",
+      "type": "string",
+      "default": "songs.txt",
+      "flag": "--input"
+    },
+    {
+      "name": "output",
+      "label": "结果 CSV 输出",
+      "type": "string",
+      "default": "quark_results.csv",
+      "flag": "--output"
+    },
+    {
+      "name": "downloadDir",
+      "label": "下载目录",
+      "type": "folder",
+      "default": "downloads",
+      "flag": "--download-dir"
+    },
+    {
+      "name": "mode",
+      "label": "下载模式",
+      "type": "select",
+      "default": "B",
+      "flag": "--mode",
+      "options": ["A", "B"]
+    },
+    {
+      "name": "bMethod",
+      "label": "模式B下载方式",
+      "type": "select",
+      "default": "http",
+      "flag": "--b-method",
+      "options": ["http", "browser"]
+    },
+    {
+      "name": "linksOnly",
+      "label": "仅收集链接不下载",
+      "type": "boolean",
+      "flag": "--links-only"
+    },
+    {
+      "name": "manualLoginOnce",
+      "label": "首次手动登录",
+      "type": "boolean",
+      "flag": "--manual-login-once"
+    },
+    {
+      "name": "delay",
+      "label": "请求间隔秒",
+      "type": "number",
+      "default": 0.8,
+      "flag": "--delay"
+    },
+    {
+      "name": "timeout",
+      "label": "页面超时秒",
+      "type": "number",
+      "default": 40,
+      "flag": "--timeout"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+/* 银河主题 UI 材质（独立引入，避免 Tailwind 解析 data-theme="galaxy"） */
+
+html[data-theme="galaxy"] .ui-card {
+  background-color: var(--ui-card-bg);
+  border-color: rgb(255 255 255 / var(--ui-card-border-alpha));
+  backdrop-filter: blur(var(--ui-card-blur));
+  -webkit-backdrop-filter: blur(var(--ui-card-blur));
+}
+
+html[data-theme="galaxy"][data-card-material="solid"] .ui-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="galaxy"][data-card-material="acrylic"] .ui-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+html[data-theme="galaxy"][data-card-material="frosted"] .ui-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 8px 32px rgb(0 0 0 / 0.2);
+}
+
+html[data-theme="galaxy"] .ui-title-block,
+html[data-theme="galaxy"] .ui-title-block--active {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="galaxy"] .ui-title-block--active {
+  padding: 0;
+}
+
+html[data-theme="galaxy"][data-title-material="plain"] .ui-title-block--active {
+  background-color: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+}
+
+html[data-theme="galaxy"][data-title-material="plain"] .ui-title {
+  text-shadow: var(--ui-title-shadow);
+}
+
+html[data-theme="galaxy"][data-title-material="solid"] .ui-title-block--active {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="galaxy"] .ui-bar,
+html[data-theme="galaxy"] .ui-sidebar {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="galaxy"] .ui-sidebar-btn--active {
+  background-color: rgb(255 255 255 / 0.12) !important;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18) !important;
+}
+
+html[data-theme="galaxy"][data-font-color="dark"] .ui-sidebar-btn--active {
+  background-color: rgb(0 0 0 / 0.08) !important;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12) !important;
+}
+
+html[data-theme="galaxy"] .ui-tag {
+  background-color: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+
+html[data-theme="galaxy"][data-font-color="dark"] .ui-card {
+  border-color: rgb(0 0 0 / var(--ui-card-border-alpha));
+}
+
+html[data-theme="galaxy"][data-font-color="dark"] .ui-title-block--active {
+  border-color: rgb(0 0 0 / var(--ui-title-border-alpha));
+}
+
+html[data-theme="galaxy"][data-font-color="dark"] .ui-tag {
+  background-color: rgb(0 0 0 / 0.06);
+  border-color: rgb(0 0 0 / 0.08);
+}

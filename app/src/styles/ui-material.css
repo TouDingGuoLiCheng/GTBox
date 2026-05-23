@@ -1,0 +1,200 @@
+/* 字符雨暗角遮罩（不用 bg-black 类名，避免像素主题全局覆盖） */
+.creative-matrix-scrim {
+  background-color: rgb(0 0 0 / 0.35);
+}
+
+html[data-theme="pixel"] .creative-matrix-scrim {
+  background-color: rgb(20 30 18 / 0.55);
+}
+
+/* 卡片 / 标题 / 顶栏 — 材质由 html data-* 与 CSS 变量驱动 */
+
+.ui-card {
+  border-radius: var(--ui-radius, 1rem);
+  border-width: 1px;
+  border-style: solid;
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    backdrop-filter 0.25s ease;
+}
+
+.ui-title-block {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: calc(var(--ui-radius, 1rem) * 0.75);
+  transition:
+    background-color 0.25s ease,
+    backdrop-filter 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.ui-title-block--active {
+  padding: 0.5rem 0.85rem;
+}
+
+.ui-title {
+  text-shadow: var(--ui-title-shadow, none);
+}
+
+.ui-bar {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  transition:
+    background-color 0.25s ease,
+    backdrop-filter 0.25s ease;
+}
+
+.ui-sidebar {
+  transition: background-color 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+.ui-tag {
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+/* —— 默认（深色 / 未自定义）—— */
+html[data-theme="dark"] .ui-card,
+html:not([data-theme]) .ui-card {
+  background-color: rgb(26 26 34 / 0.6);
+  border-color: var(--color-border);
+  backdrop-filter: blur(4px);
+}
+
+html[data-theme="dark"] .ui-bar,
+html:not([data-theme]) .ui-bar {
+  background-color: rgb(26 26 34 / 0.8);
+  border-bottom-color: var(--color-border);
+  backdrop-filter: blur(12px);
+}
+
+html[data-theme="light"] .ui-card {
+  background-color: rgb(255 255 255 / 0.92);
+  border-color: var(--color-border);
+  backdrop-filter: none;
+}
+
+html[data-theme="light"] .ui-bar {
+  background-color: rgb(255 255 255 / 0.9);
+  border-bottom-color: var(--color-border);
+}
+
+/* —— 自定义皮肤：卡片材质 —— */
+html[data-theme="custom"] .ui-card {
+  background-color: var(--ui-card-bg);
+  border-color: rgb(255 255 255 / var(--ui-card-border-alpha));
+  backdrop-filter: blur(var(--ui-card-blur));
+  -webkit-backdrop-filter: blur(var(--ui-card-blur));
+}
+
+html[data-theme="custom"][data-card-material="solid"] .ui-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="custom"][data-card-material="acrylic"] .ui-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+html[data-theme="custom"][data-card-material="frosted"] .ui-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 8px 32px rgb(0 0 0 / 0.2);
+}
+
+/* —— 自定义皮肤：标题材质 —— */
+html[data-theme="custom"] .ui-title-block--active {
+  background-color: var(--ui-title-bg);
+  border: 1px solid rgb(255 255 255 / var(--ui-title-border-alpha));
+  backdrop-filter: blur(var(--ui-title-blur));
+  -webkit-backdrop-filter: blur(var(--ui-title-blur));
+  box-shadow: var(--ui-title-box-shadow, none);
+}
+
+html[data-theme="custom"][data-title-material="plain"] .ui-title-block--active {
+  background-color: transparent;
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+}
+
+html[data-theme="custom"][data-title-material="plain"] .ui-title {
+  text-shadow: var(--ui-title-shadow);
+}
+
+html[data-theme="custom"][data-title-material="solid"] .ui-title-block--active {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 自定义皮肤：顶栏 / 分类栏透明显示背景图 */
+html[data-theme="custom"] .ui-bar,
+html[data-theme="custom"] .ui-sidebar {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="custom"] .ui-sidebar-btn--active {
+  background-color: rgb(255 255 255 / 0.12) !important;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18) !important;
+}
+
+html[data-theme="custom"][data-font-color="dark"] .ui-sidebar-btn--active {
+  background-color: rgb(0 0 0 / 0.08) !important;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12) !important;
+}
+
+html[data-theme="custom"] .ui-tag {
+  background-color: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+
+html[data-theme="custom"][data-font-color="dark"] .ui-card {
+  border-color: rgb(0 0 0 / var(--ui-card-border-alpha));
+}
+
+html[data-theme="custom"][data-font-color="dark"] .ui-title-block--active {
+  border-color: rgb(0 0 0 / var(--ui-title-border-alpha));
+}
+
+html[data-theme="custom"][data-font-color="dark"] .ui-tag {
+  background-color: rgb(0 0 0 / 0.06);
+  border-color: rgb(0 0 0 / 0.08);
+}
+
+/* 粒子星辰：卡片透明（可与自定义/银河壁纸叠加） */
+html[data-creative-transparent-cards="true"] .ui-card {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: rgb(255 255 255 / 0.14);
+}
+
+html[data-theme="light"][data-creative-transparent-cards="true"] .ui-card {
+  border-color: rgb(0 0 0 / 0.12);
+}
+
+html[data-creative-transparent-cards="true"] .ui-bar,
+html[data-creative-transparent-cards="true"] .ui-sidebar {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"][data-creative-transparent-cards="true"] .ui-sidebar-btn--active {
+  background-color: rgb(255 255 255 / 0.1) !important;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.16) !important;
+}
+
+html[data-theme="light"][data-creative-transparent-cards="true"] .ui-sidebar-btn--active {
+  background-color: rgb(0 0 0 / 0.06) !important;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1) !important;
+}

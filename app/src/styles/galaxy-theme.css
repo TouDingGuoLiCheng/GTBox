@@ -1,0 +1,31 @@
+/* 银河主题文字色（独立引入，避免 Tailwind 解析 data-theme="galaxy"） */
+
+[data-theme="galaxy"][data-font-color="light"] {
+  color: #fafafa;
+}
+
+[data-theme="galaxy"][data-font-color="light"] .text-zinc-100,
+[data-theme="galaxy"][data-font-color="light"] .text-zinc-200 {
+  color: #fafafa !important;
+}
+
+[data-theme="galaxy"][data-font-color="light"] .text-zinc-300,
+[data-theme="galaxy"][data-font-color="light"] .text-zinc-400,
+[data-theme="galaxy"][data-font-color="light"] .text-zinc-500 {
+  color: rgb(250 250 250 / 0.65) !important;
+}
+
+[data-theme="galaxy"][data-font-color="dark"] {
+  color: #18181b;
+}
+
+[data-theme="galaxy"][data-font-color="dark"] .text-zinc-100,
+[data-theme="galaxy"][data-font-color="dark"] .text-zinc-200 {
+  color: #18181b !important;
+}
+
+[data-theme="galaxy"][data-font-color="dark"] .text-zinc-300,
+[data-theme="galaxy"][data-font-color="dark"] .text-zinc-400,
+[data-theme="galaxy"][data-font-color="dark"] .text-zinc-500 {
+  color: #52525b !important;
+}

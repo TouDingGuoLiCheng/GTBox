@@ -1,0 +1,72 @@
+/** 视频皮肤预设：与背景同缩放，遮挡右下角 AI 水印 */
+.skin-watermark-cover {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  background: #000;
+  box-sizing: border-box;
+}
+
+/** 顶栏：当前皮肤预设 BGM（歌名-歌手，碟片播放时旋转） */
+.header-skin-bgm__label {
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.header-skin-bgm__disc {
+  animation: header-skin-bgm-disc-spin 2.8s linear infinite;
+}
+
+.vinyl-disc-icon {
+  display: block;
+  color: rgb(161 161 170);
+}
+
+.vinyl-disc-icon__rim {
+  fill: rgb(24 24 27 / 0.55);
+  stroke: rgb(212 212 216 / 0.85);
+  stroke-width: 1.1;
+}
+
+.vinyl-disc-icon__groove {
+  fill: none;
+  stroke: rgb(161 161 170 / 0.55);
+  stroke-width: 0.65;
+}
+
+.vinyl-disc-icon__groove--inner {
+  stroke: rgb(161 161 170 / 0.35);
+}
+
+.vinyl-disc-icon__shine {
+  fill: rgb(228 228 231 / 0.22);
+  stroke: none;
+}
+
+.vinyl-disc-icon__spoke {
+  stroke: rgb(212 212 216 / 0.75);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.vinyl-disc-icon__hub {
+  fill: rgb(39 39 42);
+  stroke: rgb(161 161 170 / 0.9);
+  stroke-width: 0.6;
+}
+
+@keyframes header-skin-bgm-disc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html[data-skin-preset="preset-clouds"] {
+  --color-accent: #6ec8e8;
+  --color-surface: #0b1018;
+  --color-surface-elevated: #152030;
+}
+
+html[data-skin-preset="preset-clouds"] .ui-card {
+  border-color: rgb(110 200 232 / 0.14);
+}

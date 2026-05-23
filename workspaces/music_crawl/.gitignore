@@ -1,0 +1,15 @@
+# 建议在 workspace 根目录创建 .venv 并安装 requirements.txt、playlist_ocr/requirements-ocr.txt
+.venv/
+
+# 运行产物与用户数据（可不提交）
+2t58_cookies.json
+songs.txt
+pending_downloads.txt
+quark_results.csv
+results.csv
+downloads/
+
+playlist_ocr/images_in/*
+!playlist_ocr/images_in/.gitkeep
+playlist_ocr/regions_cache/*
+!playlist_ocr/regions_cache/.gitkeep
