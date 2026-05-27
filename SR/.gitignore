@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/resources/models/
+src-tauri/resources/python/*
+!src-tauri/resources/python/.gitkeep
+*.log

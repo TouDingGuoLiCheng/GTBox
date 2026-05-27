@@ -1,0 +1,26 @@
+/* 与 overlayLayout.ts / overlay.rs 数值保持一致 */
+
+:root {
+
+  --overlay-card-w: 336px;
+
+  --overlay-footer-h: 52px;
+
+  --overlay-card-h: var(--overlay-footer-h);
+
+  --overlay-max-text-h: 108px;
+
+  --overlay-max-h: 160px;
+
+  --overlay-radius: 10px;
+
+  --overlay-bar-w: 4px;
+
+  --overlay-bar-gap: 3px;
+
+  --overlay-wave-h: 32px;
+
+  --overlay-wave-w: 193px;
+
+}
+

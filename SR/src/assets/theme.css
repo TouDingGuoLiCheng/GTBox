@@ -1,0 +1,40 @@
+:root,
+html.theme-dark,
+.theme-dark {
+  color-scheme: dark;
+  --shell-bg: rgb(20, 20, 26);
+  --surface: rgb(36, 36, 46);
+  --panel: rgb(30, 30, 38);
+  --input-bg: rgb(20, 20, 28);
+  --text: #e8e8ef;
+  --muted: #9a9aad;
+  --accent: #5b8def;
+  --accent-text: #fff;
+  --border: rgba(255, 255, 255, 0.1);
+  --btn-ghost-hover: rgba(255, 255, 255, 0.08);
+  --tab-active: rgba(91, 141, 239, 0.22);
+  --danger: #ff9b9b;
+  --ok: #7ddea8;
+  --warn: #ffd27d;
+  --code-bg: rgba(255, 255, 255, 0.06);
+}
+
+html.theme-light,
+.theme-light {
+  color-scheme: light;
+  --shell-bg: rgb(245, 245, 248);
+  --surface: rgb(255, 255, 255);
+  --panel: rgb(255, 255, 255);
+  --input-bg: rgb(245, 245, 250);
+  --text: #1a1a22;
+  --muted: #5c5c6e;
+  --accent: #2563eb;
+  --accent-text: #fff;
+  --border: rgba(0, 0, 0, 0.1);
+  --btn-ghost-hover: rgba(0, 0, 0, 0.06);
+  --tab-active: rgba(37, 99, 235, 0.12);
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --warn: #ca8a04;
+  --code-bg: rgba(0, 0, 0, 0.05);
+}

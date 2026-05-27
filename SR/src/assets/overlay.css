@@ -1,0 +1,68 @@
+@import "./theme.css";
+
+@import "./overlay-layout-vars.css";
+
+
+
+* {
+
+  box-sizing: border-box;
+
+}
+
+
+
+html,
+
+body,
+
+#app {
+
+  margin: 0;
+
+  width: 100%;
+
+  height: 100%;
+
+  overflow: hidden;
+
+  background: transparent !important;
+
+}
+
+
+
+.overlay-stage {
+
+  width: 100%;
+
+  height: 100%;
+
+  display: flex;
+
+  align-items: stretch;
+
+  justify-content: stretch;
+
+  padding: 0;
+
+  margin: 0;
+
+  background: transparent;
+
+}
+
+
+
+.overlay-stage .overlay-bar {
+
+  width: 100%;
+
+  height: 100%;
+
+  max-width: none;
+
+  border-radius: var(--overlay-radius);
+
+}
+

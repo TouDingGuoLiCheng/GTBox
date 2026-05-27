@@ -1,0 +1,243 @@
+@import "./overlay-layout-vars.css";
+
+.overlay-bar {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--overlay-card-w);
+  min-height: var(--overlay-footer-h);
+  border-radius: var(--overlay-radius);
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: none !important;
+  border: none !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-bar__bg,
+.overlay-bar__glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlay-bar__glass {
+  z-index: 1;
+}
+
+.overlay-bar__bg {
+  z-index: 0;
+}
+
+.overlay-bar__text {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px 4px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--overlay-text);
+  font-size: 13px;
+  line-height: 20px;
+  font-family: inherit;
+  overflow-y: auto;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+}
+
+.overlay-bar__text--error {
+  color: #ff8f8f;
+}
+
+.overlay-bar__text--stream {
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: default;
+}
+
+.overlay-bar__char {
+  display: inline-block;
+}
+
+.overlay-bar__char--enter {
+  animation: overlay-char-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes overlay-char-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.42em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-bar__char--enter {
+    animation: none;
+  }
+}
+
+.overlay-bar__text::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overlay-bar__text::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.45);
+  border-radius: 4px;
+}
+
+.overlay-bar__footer {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  flex: 0 0 var(--overlay-footer-h);
+  height: var(--overlay-footer-h);
+  width: 100%;
+  padding: 0 6px;
+  gap: 4px;
+  box-sizing: border-box;
+  min-width: 0;
+  cursor: move;
+  -webkit-app-region: no-drag;
+}
+
+.overlay-bar__footer-left {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.overlay-bar__footer-mid {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0 4px 0 2px;
+}
+
+.overlay-bar__footer-right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.overlay-bar__brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overlay-bar__rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(140, 150, 170, 0.85);
+}
+
+.overlay-bar__rec-dot--live {
+  background: #ff4d5a;
+  animation: overlay-rec-pulse 1.35s ease-out infinite;
+}
+
+.overlay-bar__rec-dot--edit {
+  background: #34c759;
+}
+
+.overlay-bar__text--clickable {
+  cursor: text;
+}
+
+@keyframes overlay-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.overlay-bar__brand {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--bar-a), var(--bar-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding: 0 1px;
+}
+
+.overlay-bar__wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  height: 22px;
+  min-width: 0;
+}
+
+.overlay-bar__wave span {
+  width: 3px;
+  min-height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--wave-a), var(--wave-b));
+  transition: height 80ms ease-out;
+  flex-shrink: 0;
+}
+
+.overlay-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.overlay-bar__icon-btn {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  color: var(--overlay-text);
+  background: transparent;
+}
+
+.overlay-bar__icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.overlay-bar__icon-btn--ghost:hover {
+  background: rgba(128, 128, 128, 0.16);
+}
+
+.overlay-bar__icon-btn--confirm:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.16);
+}
+
+.overlay-bar__icon-btn--confirm:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
