@@ -76,17 +76,14 @@ GTBox/
 │   ├── music_crawl/        # 音乐爬取（默认工作区）
 │   ├── auto_change_file_name/
 │   ├── split_pic/
-│   ├── quick_translate/    # 选中即译相关脚本（部分能力已并入 app）
-│   ├── sr_asr/             # 流式语音识别引擎（供 SR 子工程）
+│   ├── quick_translate/    # 选中即译脚本（供 app 内翻译模块）
 │   └── skin-presets/       # 内置皮肤视频等资源
-├── SR/                     # 语音输入子工程（流式 ASR，计划 P1 并入 app）
 ├── scripts/                # 与产品无关的辅助脚本（如 dev 对比、壁纸下载等）
 ├── 开发方案.md              # 产品与技术总方案
-├── 快捷翻译-开发方案.md      # 快捷翻译演进说明
 └── README.md               # 本文件
 ```
 
-> **说明**：根目录 `.gitignore` 排除了 `quick-translate/` 独立工程目录；该能力部分已集成在 `app` 的翻译模块中，完整独立仓需单独克隆。
+> **说明**：`SR/` 与 `quick-translate/` 为与工具箱同级的独立工程，位于 `d:\VS\SR` 与 `d:\VS\quick-translate`；本仓库仅保留工具箱主程序与插件/工作区。
 
 ---
 
@@ -158,7 +155,6 @@ python -m venv .venv
 |--------|------|
 | `workspaces/split_pic/` | 长截图分割，见该目录 `requirements.txt` |
 | `workspaces/auto_change_file_name/` | 批量改名，使用系统 Python 或自建 venv |
-| `workspaces/sr_asr/` | 语音引擎，见 [`workspaces/sr_asr/README.md`](./workspaces/sr_asr/README.md) |
 
 在设置里将 **工作区根目录** 切换到对应子目录后，插件 manifest 中的相对路径才会解析正确。
 
@@ -203,29 +199,38 @@ npm run tauri build  # 打包安装程序（后期里程碑）
 
 ---
 
-## 相关子工程
+## 相关独立工程
+
+与工具箱仓库同级目录（`d:\VS\` 下），各自独立开发与打包：
+
+| 工程 | 路径 | 说明 |
+|------|------|------|
+| **SR · 语音输入** | `d:\VS\SR` | 按住全局快捷键说话，松手后注入当前输入框 |
+| **GLC Quick Translate** | `d:\VS\quick-translate` | 划词/快捷键翻译，托盘常驻 |
 
 ### SR · 本地流式语音输入
 
-目录 [`SR/`](./SR/)：按住全局快捷键说话，松手后把识别文字注入当前输入框。  
-引擎脚本在 `workspaces/sr_asr/`，计划 **P1** 合并进主 `app/`。
-
 ```powershell
-cd workspaces\sr_asr
+cd "d:\VS\SR\workspaces\sr_asr"
 python -m pip install -r requirements.txt
 .\download_model.ps1
 
-cd ..\..\SR
+cd "d:\VS\SR"
 npm install
 npm run tauri dev
 ```
 
-详见 [`SR/README.md`](./SR/README.md)、[`SR/开发方案.md`](./SR/开发方案.md)。
+详见 `d:\VS\SR\README.md`、`d:\VS\SR\开发方案.md`。
 
 ### 快捷翻译
 
-独立工程目录 `quick-translate/` **未纳入本仓库**（见 `.gitignore`）。  
-方案与合并路线见 [`快捷翻译-开发方案.md`](./快捷翻译-开发方案.md)；`workspaces/quick_translate/` 保留部分脚本供参考或桥接。
+```powershell
+cd "d:\VS\quick-translate"
+npm install
+npm run tauri dev
+```
+
+详见 `d:\VS\quick-translate\README.md`。工具箱 `app/` 内翻译页为部分能力集成，与独立工程配置目录分离。
 
 ---
 

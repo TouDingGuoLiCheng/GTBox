@@ -7,9 +7,9 @@
   "icon": "mdi:image-search-outline",
   "tags": ["ocr", "offline"],
   "script": {
-    "entry": "playlist_ocr/extract_playlist.py",
+    "entry": "music_crawl/playlist_ocr/extract_playlist.py",
     "interpreter": "venv",
-    "cwd": "playlist_ocr"
+    "cwd": "music_crawl/playlist_ocr"
   },
   "params": [
     {
@@ -18,6 +18,12 @@
       "type": "folder",
       "default": "playlist_ocr/images_in",
       "flag": "--input"
+    },
+    {
+      "name": "images",
+      "label": "指定截图文件",
+      "type": "string",
+      "flag": "--images"
     },
     {
       "name": "output",

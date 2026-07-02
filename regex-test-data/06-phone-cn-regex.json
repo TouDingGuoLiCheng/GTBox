@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "matches_text_1",
+      "type": "matches_text",
+      "position": {
+        "x": 0,
+        "y": 60
+      },
+      "params": {
+        "text": "1",
+        "ignoreCase": false,
+        "builderMode": "segment"
+      }
+    },
+    {
+      "id": "position_char_2",
+      "type": "position_char",
+      "position": {
+        "x": 120,
+        "y": 60
+      },
+      "params": {
+        "mode": "range",
+        "literal": "",
+        "rangeFrom": "3",
+        "rangeTo": "9"
+      }
+    },
+    {
+      "id": "char_run_3",
+      "type": "char_run",
+      "position": {
+        "x": 240,
+        "y": 60
+      },
+      "params": {
+        "kind": "digit",
+        "n": 9
+      }
+    },
+    {
+      "id": "scope_4",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_5",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seg_0",
+      "source": "matches_text_1",
+      "sourceHandle": "next",
+      "target": "position_char_2",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_seg_1",
+      "source": "position_char_2",
+      "sourceHandle": "next",
+      "target": "char_run_3",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_predicate",
+      "source": "char_run_3",
+      "sourceHandle": "out",
+      "target": "scope_4",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_root",
+      "source": "scope_4",
+      "sourceHandle": "bool",
+      "target": "root_5",
+      "targetHandle": "in"
+    }
+  ]
+}

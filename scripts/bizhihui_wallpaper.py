@@ -27,12 +27,24 @@ USER_AGENT = (
 )
 
 # 页面内「下载原图」链接 id=changeTxt2；电脑横屏 id=changeTxtdn
+# 新站: /zb_users/upload/...  旧站: /upload/...
+RE_PANLAI_IMAGE = (
+    r"https://s\.panlai\.com/(?:zb_users/)?upload/[^\"?]+\.(?:png|jpg|jpeg|webp)"
+)
+RE_ORIGINAL_LINK = re.compile(
+    rf'href="({RE_PANLAI_IMAGE})"[^>]*id="changeTxt2"',
+    re.IGNORECASE,
+)
 RE_ORIGINAL = re.compile(
-    r'href="(https://s\.panlai\.com/zb_users/upload/[^"?]+\.(?:png|jpg|jpeg|webp))"',
+    rf'href="({RE_PANLAI_IMAGE})"',
     re.IGNORECASE,
 )
 RE_DESKTOP = re.compile(
     r'id="changeTxtdn"[^>]*href="([^"]+)"',
+    re.IGNORECASE,
+)
+RE_LIGHTBOX = re.compile(
+    r'class="img-lightbox[^"]*"[^>]*src="([^"]+)"',
     re.IGNORECASE,
 )
 RE_POST_ID = re.compile(r"/p/(\d+)\.html", re.IGNORECASE)
@@ -67,13 +79,33 @@ def fetch_page(session: requests.Session, page_url: str) -> str:
     return resp.text
 
 
-def pick_download_url(html: str, size: str) -> tuple[str, str]:
-    originals = RE_ORIGINAL.findall(html)
-    if not originals:
-        raise ValueError("未在页面中找到原图地址，页面结构可能已变更")
+def thumb_to_original(url: str) -> str:
+    """预览图 -arthumbs / -pcthumbs 后缀 → 原图 URL。"""
+    for suffix in ("-arthumbs", "-pcthumbs"):
+        if url.endswith(suffix):
+            base, ext = url[: -len(suffix)].rsplit(".", 1)
+            return f"{base}.{ext}"
+    return url
 
-    # 同一作品通常只对应一个 upload 路径，取出现次数最多的
-    base_url = max(set(originals), key=originals.count)
+
+def pick_base_url(html: str) -> str:
+    link = RE_ORIGINAL_LINK.search(html)
+    if link:
+        return link.group(1)
+
+    originals = RE_ORIGINAL.findall(html)
+    if originals:
+        return max(set(originals), key=originals.count)
+
+    lightbox = RE_LIGHTBOX.search(html)
+    if lightbox:
+        return thumb_to_original(lightbox.group(1))
+
+    raise ValueError("未在页面中找到原图地址，页面结构可能已变更")
+
+
+def pick_download_url(html: str, size: str) -> tuple[str, str]:
+    base_url = pick_base_url(html)
 
     if size == "original":
         return base_url, "原图"

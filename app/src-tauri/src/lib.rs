@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -12,6 +12,11 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
+
+mod translate;
+mod text_compare;
+mod speed_player;
+mod gomoku_lan;
 use rfd::FileDialog;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,6 +119,11 @@ struct OcrRegion {
     pair_index: Option<u32>,
     #[serde(default)]
     note: Option<String>,
+    /// 原图像素宽度，前端按此换算显示坐标，避免预览缩略图被下采样后框错位
+    #[serde(default)]
+    image_width: Option<f64>,
+    #[serde(default)]
+    image_height: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,8 +146,8 @@ fn settings_path() -> Result<PathBuf, String> {
         .join("settings.json"))
 }
 
-/// 工具箱仓库根目录：`.../工具箱开发`（`app/src-tauri` 的上两级）
-fn toolbox_root() -> PathBuf {
+/// 开发期仓库根目录：`.../工具箱开发`（`app/src-tauri` 的上两级）
+fn dev_toolbox_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(|p| p.parent())
@@ -145,23 +155,45 @@ fn toolbox_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// 开发期应用工程根目录：`.../工具箱开发/app`
+fn dev_app_root() -> PathBuf {
+    dev_toolbox_root().join("app")
+}
+
+fn install_data_root() -> Option<PathBuf> {
+    let exe = env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    for root in [dir.to_path_buf(), dir.join("resources")] {
+        if root.join("plugins").is_dir() && root.join("workspaces").is_dir() {
+            return Some(root);
+        }
+    }
+    None
+}
+
+fn data_root() -> PathBuf {
+    install_data_root().unwrap_or_else(dev_app_root)
+}
+
 fn default_workspace_root() -> String {
-    toolbox_root()
-        .join("workspaces")
+    workspaces_root()
         .join("music_crawl")
         .to_string_lossy()
         .into_owned()
 }
 
 fn plugins_root() -> PathBuf {
-    toolbox_root().join("plugins")
+    if let Some(root) = install_data_root() {
+        return root.join("plugins");
+    }
+    dev_toolbox_root().join("plugins")
 }
 
 fn workspaces_root() -> PathBuf {
-    toolbox_root().join("workspaces")
+    data_root().join("workspaces")
 }
 
-/// 插件脚本路径：优先相对仓库 `workspaces/`（如 auto_change_file_name/），否则相对用户工作区（如 music_crawl/）
+/// 插件脚本路径：优先 `app/workspaces/<entry>`（如 music_crawl/playlist_ocr/），否则相对用户工作区
 fn resolve_script_path(workspace_root: &str, entry: &str) -> PathBuf {
     let entry_path = Path::new(entry);
     if entry_path.is_absolute() {
@@ -200,18 +232,24 @@ fn resolve_python_interpreter(
 ) -> PathBuf {
     match interpreter_hint.unwrap_or("python") {
         "venv" => {
+            // 1) 脚本 cwd 下的 .venv（如 app/workspaces/music_crawl/.venv）
             if let Some(cwd) = script_cwd {
                 let local = cwd.join(".venv\\Scripts\\python.exe");
                 if local.exists() {
                     return local;
                 }
             }
+            // 2) 用户设置中的 workspace_root/.venv
             let candidate = Path::new(&settings.workspace_root).join(".venv\\Scripts\\python.exe");
             if candidate.exists() {
-                candidate
-            } else {
-                PathBuf::from("python")
+                return candidate;
             }
+            // 3) 仓库根 .venv（工具箱开发/.venv）
+            let repo_root_venv = dev_toolbox_root().join(".venv\\Scripts\\python.exe");
+            if repo_root_venv.exists() {
+                return repo_root_venv;
+            }
+            PathBuf::from("python")
         }
         "python" => {
             let configured = resolve_path(&settings.workspace_root, &settings.python_path);
@@ -400,11 +438,17 @@ fn spawn_log_reader<R: std::io::Read + Send + 'static>(
     });
 }
 
+struct PythonRunPlan {
+    command: Command,
+    script_path: PathBuf,
+    cwd: PathBuf,
+}
+
 fn build_python_command(
     settings: &AppSettings,
     plugin: &PluginManifest,
     input_params: Option<Map<String, Value>>,
-) -> Result<Command, String> {
+) -> Result<PythonRunPlan, String> {
     let interpreter_kind = plugin
         .script
         .interpreter
@@ -437,8 +481,8 @@ fn build_python_command(
 
     let mut cmd = Command::new(interpreter);
     apply_python_utf8_env(&mut cmd);
-    cmd.arg(script_path)
-        .current_dir(cwd)
+    cmd.arg(&script_path)
+        .current_dir(&cwd)
         .env("PYTHONUNBUFFERED", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -490,7 +534,11 @@ fn build_python_command(
         }
     }
 
-    Ok(cmd)
+    Ok(PythonRunPlan {
+        command: cmd,
+        script_path,
+        cwd,
+    })
 }
 
 #[tauri::command]
@@ -553,12 +601,6 @@ fn run_tool(
 ) -> Result<String, String> {
     let settings = get_settings()?;
     let plugin = load_plugin_manifest(&plugin_id)?;
-    let mut command = build_python_command(&settings, &plugin, params)?;
-    let mut child = command
-        .spawn()
-        .map_err(|e| format!("启动脚本失败: {} ({})", plugin_id, e))?;
-
-    let pid = child.id();
     let run_id = format!(
         "{}-{}",
         plugin_id,
@@ -567,6 +609,28 @@ fn run_tool(
             .map_err(|e| format!("生成 run_id 失败: {}", e))?
             .as_millis()
     );
+
+    let mut plan = build_python_command(&settings, &plugin, params)?;
+    let _ = app.emit(
+        "tool:log",
+        ToolLogEvent {
+            run_id: run_id.clone(),
+            stream: String::from("stdout"),
+            line: format!(
+                "[OCR] 工作区: {} | cwd: {} | 脚本: {}",
+                settings.workspace_root,
+                plan.cwd.display(),
+                plan.script_path.display()
+            ),
+        },
+    );
+
+    let mut child = plan
+        .command
+        .spawn()
+        .map_err(|e| format!("启动脚本失败: {} ({})", plugin_id, e))?;
+
+    let pid = child.id();
 
     if let Ok(mut map) = state.running_pids.lock() {
         map.insert(run_id.clone(), pid);
@@ -677,7 +741,7 @@ fn read_image_as_data_url(path: String) -> Result<String, String> {
     Ok(format!("data:{};base64,{}", mime, STANDARD.encode(bytes)))
 }
 
-/// 将用户选择的媒体文件复制到 toolbox/workspaces 下（用于创意背景字符画等）
+/// 将用户选择的媒体文件复制到 app/workspaces 下（用于创意背景字符画等）
 #[tauri::command]
 fn copy_file_to_workspaces(source_abs: String, subpath: String) -> Result<String, String> {
     let src = PathBuf::from(&source_abs);
@@ -983,6 +1047,107 @@ fn pick_text_file() -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+/// 选择歌单文件：txt 或 csv，用于阶段B 的「输入歌单文件」选择按钮。
+#[tauri::command]
+fn pick_song_list_file() -> Option<String> {
+    FileDialog::new()
+        .add_filter("Song list", &["txt", "csv"])
+        .pick_file()
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// 用户从 DevTools 复制的 `Cookie: name=value; name2=value2; ...` header 字符串，
+/// 解析后保存到 `app/workspaces/music_crawl/2t58_cookies.json`，
+/// 下次 full_auto_download_2t58.py 启动时 `attach_2t58_cookies` 会自动加载它。
+/// 触发场景：网站「今日下载次数已达上限」需要在浏览器完成口令验证后回到 app 更新 Cookie。
+#[tauri::command]
+fn update_2t58_cookies(cookie_text: String) -> Result<usize, String> {
+    // 容错：兼容「Cookie: xxx=yyy; ...」前缀
+    let trimmed = cookie_text
+        .trim()
+        .trim_start_matches("Cookie:")
+        .trim_start_matches("cookie:")
+        .trim();
+    if trimmed.is_empty() {
+        return Err("Cookie 内容为空".to_string());
+    }
+
+    let mut cookies: Vec<serde_json::Value> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for raw_part in trimmed.split(';') {
+        let part = raw_part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let Some((name, value)) = part.split_once('=') else {
+            continue;
+        };
+        let name = name.trim().to_string();
+        let value = value.trim().to_string();
+        if name.is_empty() || !seen.insert(name.clone()) {
+            continue;
+        }
+        cookies.push(serde_json::json!({
+            "name": name,
+            "value": value,
+            "domain": ".2t58.com",
+            "path": "/",
+        }));
+    }
+
+    if cookies.is_empty() {
+        return Err("未解析到任何 name=value 形式的 Cookie 项".to_string());
+    }
+
+    // 固定写到仓库的 app/workspaces/music_crawl/2t58_cookies.json：
+    // 这是 Python 脚本 (cwd = app/workspaces/music_crawl) 默认读取的位置；
+    // 不能依赖 settings.workspace_root，否则当 workspace_root 默认就是 music_crawl 时会拼成
+    // app/workspaces/music_crawl/music_crawl/2t58_cookies.json 双层目录，导致脚本读不到。
+    let path = workspaces_root().join("music_crawl").join("2t58_cookies.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建目录失败: {} ({})", parent.display(), e))?;
+    }
+    let payload = serde_json::to_string_pretty(&cookies)
+        .map_err(|e| format!("序列化 Cookie JSON 失败: {}", e))?;
+    fs::write(&path, payload)
+        .map_err(|e| format!("写入 Cookie 文件失败: {} ({})", path.display(), e))?;
+    Ok(cookies.len())
+}
+
+/// 通用「另存为」对话框：允许用户指定一个尚未存在的文件路径。
+/// `default_name`：弹窗默认填好的文件名；`filter_label`/`filter_exts` 为过滤器。
+#[tauri::command]
+fn pick_save_file(
+    default_name: Option<String>,
+    filter_label: Option<String>,
+    filter_exts: Option<Vec<String>>,
+) -> Option<String> {
+    let mut dlg = FileDialog::new();
+    if let (Some(label), Some(exts)) = (filter_label.as_deref(), filter_exts.as_ref()) {
+        let ext_refs: Vec<&str> = exts.iter().map(String::as_str).collect();
+        dlg = dlg.add_filter(label, &ext_refs);
+    }
+    if let Some(name) = default_name.as_deref() {
+        dlg = dlg.set_file_name(name);
+    }
+    dlg.save_file().map(|p| p.to_string_lossy().to_string())
+}
+
+/// 通用「打开文件」对话框：`filter_label`/`filter_exts` 为可选过滤器。
+#[tauri::command]
+fn pick_open_file(
+    filter_label: Option<String>,
+    filter_exts: Option<Vec<String>>,
+) -> Option<String> {
+    let mut dlg = FileDialog::new();
+    if let (Some(label), Some(exts)) = (filter_label.as_deref(), filter_exts.as_ref()) {
+        let ext_refs: Vec<&str> = exts.iter().map(String::as_str).collect();
+        dlg = dlg.add_filter(label, &ext_refs);
+    }
+    dlg.pick_file().map(|p| p.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn detect_image_regions(image_path: String, device: Option<String>) -> Result<Vec<OcrRegion>, String> {
     let settings = get_settings()?;
@@ -1110,12 +1275,31 @@ fn set_window_desktop_peek(
     }
 }
 
+#[tauri::command]
+async fn compare_folders(
+    app: AppHandle,
+    target: String,
+    candidate: String,
+) -> Result<text_compare::FolderCompareResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        text_compare::compare_folders_sync(&app, &target, &candidate)
+    })
+    .await
+    .map_err(|e| format!("比对任务失败: {e}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(translate::init_state())
+        .manage(speed_player::init_state())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            translate::setup(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
@@ -1138,9 +1322,35 @@ pub fn run() {
             copy_file_to_workspaces,
             write_workspaces_file,
             pick_text_file,
+            pick_song_list_file,
+            pick_save_file,
+            pick_open_file,
+            compare_folders,
+            text_compare::text_compare_get_settings,
+            text_compare::text_compare_save_settings,
+            text_compare::write_text_file,
+            update_2t58_cookies,
             detect_image_regions,
             recognize_regions,
-            set_window_desktop_peek
+            set_window_desktop_peek,
+            translate::translate_get_settings,
+            translate::translate_save_settings,
+            translate::translate_text,
+            translate::translate_list_history,
+            translate::translate_clear_history,
+            translate::translate_delete_history,
+            translate::translate_list_providers,
+            gomoku_lan::gomoku_lan_start,
+            gomoku_lan::gomoku_lan_stop,
+            gomoku_lan::gomoku_lan_status,
+            gomoku_lan::gomoku_lan_discover,
+            speed_player::speed_player_attach,
+            speed_player::speed_player_resize,
+            speed_player::speed_player_detach,
+            speed_player::speed_player_eval,
+            speed_player::speed_player_focus,
+            speed_player::speed_player_diagnostics,
+            speed_player::speed_player_send_action
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

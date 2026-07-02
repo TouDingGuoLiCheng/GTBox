@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GLC ToolBox",
-  "version": "0.1.0",
-  "identifier": "com.guolicheng.toolbox",
+  "productName": "GTBox",
+  "version": "1.0.0",
+  "identifier": "com.guolicheng.gtbox",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://127.0.0.1:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "GLC ToolBox",
+        "title": "GTBox",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -21,6 +21,18 @@
         "decorations": false,
         "transparent": true,
         "shadow": false
+      },
+      {
+        "label": "translate-scraper",
+        "title": "翻译抓取",
+        "url": "about:blank",
+        "width": 900,
+        "height": 700,
+        "create": false,
+        "visible": false,
+        "decorations": false,
+        "skipTaskbar": true,
+        "focus": false
       }
     ],
     "security": {
@@ -33,7 +45,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "resources": {
+      "resources/bundle/plugins/": "plugins/",
+      "resources/bundle/workspaces/": "workspaces/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

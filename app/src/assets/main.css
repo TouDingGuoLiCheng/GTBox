@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../styles/ui-material.css";
 @import "../styles/window-chrome-ui-material.css";
+@import "../styles/rule-graph-material.css";
 
 @theme {
   --color-surface: #0f0f12;

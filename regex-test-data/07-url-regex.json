@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "starts_with_1",
+      "type": "starts_with",
+      "position": {
+        "x": 40,
+        "y": 100
+      },
+      "params": {
+        "preset": "text",
+        "text": "http",
+        "ignoreCase": true
+      }
+    },
+    {
+      "id": "scope_2",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_3",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_predicate",
+      "source": "starts_with_1",
+      "sourceHandle": "out",
+      "target": "scope_2",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_root",
+      "source": "scope_2",
+      "sourceHandle": "bool",
+      "target": "root_3",
+      "targetHandle": "in"
+    }
+  ]
+}

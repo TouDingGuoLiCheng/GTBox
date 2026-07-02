@@ -213,6 +213,23 @@ function scheduleMeasure(force = false) {
   });
 }
 
+function releaseMediaElements() {
+  const v = videoRef.value;
+  if (v) {
+    v.pause();
+    v.removeAttribute("src");
+    v.load();
+  }
+  const img = imageRef.value;
+  if (img) {
+    img.removeAttribute("src");
+  }
+  const prev = resolvedSrc.value;
+  if (prev?.startsWith("blob:")) {
+    URL.revokeObjectURL(prev);
+  }
+}
+
 function bindVideoState(el: HTMLVideoElement | null) {
   if (boundVideoEl && boundVideoEl !== el) {
     boundVideoEl.removeEventListener("resize", onVideoIntrinsicResize);
@@ -280,6 +297,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   debugLog("unmounted");
+  releaseMediaElements();
   resizeObserver?.disconnect();
   if (rafId) cancelAnimationFrame(rafId);
   boundVideoEl?.removeEventListener("resize", onVideoIntrinsicResize);
@@ -300,7 +318,10 @@ watch(
 
 watch(
   () => props.src,
-  (next) => {
+  (next, prev) => {
+    if (prev && prev !== next) {
+      releaseMediaElements();
+    }
     resolvedSrc.value = next;
     encodedFallbackTried.value = false;
     imageErrored.value = false;

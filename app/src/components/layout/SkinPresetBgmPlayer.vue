@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useAppearanceStore } from "../../stores/appearance";
 
 const appearance = useAppearanceStore();
+const route = useRoute();
 
 const audioRef = ref<HTMLAudioElement | null>(null);
 const bgmUrl = ref<string | null>(null);
@@ -11,6 +13,8 @@ const bgmUrl = ref<string | null>(null);
 const activeBgm = computed(() => appearance.activeSkinBgm());
 
 const shouldPlay = computed(() => {
+  if (appearance.toolAudioSuppressed) return false;
+  if (route.meta.suppressSkinBgm === true) return false;
   if (appearance.colorScheme !== "custom") return false;
   if (!appearance.skinPresetBgm.enabled) return false;
   if (
@@ -141,6 +145,13 @@ watch(
 watch(
   () =>
     [appearance.skinPresetBgm.enabled, appearance.skinPresetBgm.volume, appearance.colorScheme] as const,
+  () => {
+    void syncPlayback();
+  },
+);
+
+watch(
+  () => [appearance.toolAudioSuppressed, route.meta.suppressSkinBgm] as const,
   () => {
     void syncPlayback();
   },

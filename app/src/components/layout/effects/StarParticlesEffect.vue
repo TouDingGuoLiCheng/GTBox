@@ -96,6 +96,12 @@ let lastFrameTime = 0;
 let poleX = 0;
 let poleY = 0;
 let omega = 0;
+/**
+ * 星极为圆心、整圈轨道点都不触发删星的最大半径（相对删星框 [-M,W+M]×[-M,H+M]）
+ */
+let rOrbitDisk = 0;
+/** 飞出此边距外才删星/补星；与 rOrbitDisk 联动，使该圆周线卡在删星边界上 */
+let respawnMargin = 36;
 
 function intensityT() {
   return props.intensity / 100;
@@ -129,8 +135,9 @@ const TRAIL_STEP_PX = 2;
 /** 绘制星轨时单条折线最多段数 */
 const MAX_TRAIL_SEGMENTS = 56;
 
-/** 离开可视区后在此边距外重生（避免公转后边角长期缺星） */
-const RESPAWN_OUT_MARGIN = 36;
+/** 删星外边距下限（补星出生带需落在 (下限, respawnMargin) 内） */
+const RESPAWN_MARGIN_MIN = 26;
+const RESPAWN_MARGIN_MAX = 52;
 
 const canvasContextOptions: CanvasRenderingContext2DSettings = {
   desynchronized: true,
@@ -149,11 +156,53 @@ function pushTrailAlongArc(s: Star, fromAngle: number, toAngle: number) {
   }
 }
 
+function screenInscribedRadius() {
+  if (viewW < 2 || viewH < 2) return 0;
+  return Math.min(poleX, viewW - poleX, poleY, viewH - poleY);
+}
+
+/**
+ * 按视口校准删星边距 M，使存活轨道圆 R = min(cx+M, …) 的圆周落在删星触发线上
+ * （星可短暂处于屏外 [0,W]×[0,H] 内但仍存活，直到越过 ±M 边框）
+ */
+function updateRespawnMargin() {
+  const rScreen = screenInscribedRadius();
+  if (rScreen <= 0) {
+    respawnMargin = 32;
+    return;
+  }
+  respawnMargin = Math.round(
+    Math.max(
+      RESPAWN_MARGIN_MIN,
+      Math.min(
+        RESPAWN_MARGIN_MAX,
+        rScreen * 0.11 + Math.min(viewW, viewH) * 0.024,
+      ),
+    ),
+  );
+}
+
+/** R：以星极为心、整圈公转都不越过删星框的最大轨道半径 */
+function computeOrbitDiskRadius() {
+  const m = respawnMargin;
+  if (viewW < 2 || viewH < 2) return 0;
+  return Math.min(poleX + m, viewW - poleX + m, poleY + m, viewH - poleY + m);
+}
+
 function updatePoleAndOmega() {
   poleX = viewW * 0.58;
   poleY = viewH * 0.46;
   const t = intensityT();
   omega = -(0.0022 + t * 0.0016);
+  updateRespawnMargin();
+  rOrbitDisk = computeOrbitDiskRadius();
+}
+
+/** 屏幕内、存活轨道圆外 = 待补区域（四角缺星带） */
+function isInReplenishZone(x: number, y: number) {
+  if (x < 0 || x > viewW || y < 0 || y > viewH) return false;
+  if (rOrbitDisk <= 0) return true;
+  return Math.hypot(x - poleX, y - poleY) > rOrbitDisk;
 }
 
 function createStar(
@@ -195,108 +244,126 @@ function randomSpawnPoint(): { x0: number; y0: number } {
   return { x0: Math.random() * viewW, y0: Math.random() * viewH };
 }
 
-/** 与极点公转圆相交后，四角空白三角区在每条边上的跨度（像素） */
-function computeCornerVoidSpans() {
-  const cx = poleX;
-  const cy = poleY;
-  const rCover =
-    Math.min(
-      Math.hypot(cx, cy),
-      Math.hypot(viewW - cx, cy),
-      Math.hypot(cx, viewH - cy),
-      Math.hypot(viewW - cx, viewH - cy),
-    ) * 0.92;
-
-  const xTopLeft = cx - Math.sqrt(Math.max(0, rCover * rCover - cy * cy));
-  const xTopRight = cx + Math.sqrt(Math.max(0, rCover * rCover - cy * cy));
-  const yLeftTop = cy - Math.sqrt(Math.max(0, rCover * rCover - cx * cx));
-  const yLeftBottom = cy + Math.sqrt(Math.max(0, rCover * rCover - cx * cx));
-
-  const yBottom = viewH - cy;
-  const xBottomLeft = cx - Math.sqrt(Math.max(0, rCover * rCover - yBottom * yBottom));
-  const xBottomRight = cx + Math.sqrt(Math.max(0, rCover * rCover - yBottom * yBottom));
-
-  const xRight = viewW - cx;
-  const yRightTop = cy - Math.sqrt(Math.max(0, rCover * rCover - xRight * xRight));
-  const yRightBottom = cy + Math.sqrt(Math.max(0, rCover * rCover - xRight * xRight));
-
-  return {
-    tl: { alongTop: Math.max(24, xTopLeft), alongLeft: Math.max(24, yLeftTop) },
-    tr: {
-      alongTop: Math.max(24, viewW - xTopRight),
-      alongRight: Math.max(24, yRightTop),
-    },
-    bl: {
-      alongBottom: Math.max(24, xBottomLeft),
-      alongLeft: Math.max(24, viewH - yLeftBottom),
-    },
-    br: {
-      alongBottom: Math.max(24, viewW - xBottomRight),
-      alongRight: Math.max(24, viewH - yRightBottom),
-    },
-  };
-}
-
+/** 补星出生距：屏外但短于删星外边距 respawnMargin */
 function exteriorOutOffset() {
   const minOut = 8;
-  const maxOut = RESPAWN_OUT_MARGIN - 4;
+  const maxOut = Math.max(minOut + 2, respawnMargin - 4);
   return minOut + Math.random() * (maxOut - minOut);
 }
 
-/**
- * 补星：在四角空白三角区对应的两条边外侧略出屏（L 形 + 角尖），再公转进入画面
- */
-function randomCornerOutsideSpawnPoint(): { x0: number; y0: number } {
-  if (viewW < 80 || viewH < 80) {
-    const o = exteriorOutOffset();
-    return { x0: -o, y0: -o };
-  }
-
-  const spans = computeCornerVoidSpans();
-  const out = exteriorOutOffset();
-  const corner = Math.floor(Math.random() * 4);
-  const roll = Math.random();
-
-  switch (corner) {
-    case 0: {
-      const { alongTop, alongLeft } = spans.tl;
-      if (roll < 0.28) return { x0: -out, y0: -out };
-      if (roll < 0.62) {
-        return { x0: Math.random() * alongTop, y0: -out };
-      }
-      return { x0: -out, y0: Math.random() * alongLeft };
-    }
-    case 1: {
-      const { alongTop, alongRight } = spans.tr;
-      if (roll < 0.28) return { x0: viewW + out, y0: -out };
-      if (roll < 0.62) {
-        return { x0: viewW - Math.random() * alongTop, y0: -out };
-      }
-      return { x0: viewW + out, y0: Math.random() * alongRight };
-    }
-    case 2: {
-      const { alongBottom, alongLeft } = spans.bl;
-      if (roll < 0.28) return { x0: -out, y0: viewH + out };
-      if (roll < 0.62) {
-        return { x0: Math.random() * alongBottom, y0: viewH + out };
-      }
-      return { x0: -out, y0: viewH - Math.random() * alongLeft };
-    }
-    default: {
-      const { alongBottom, alongRight } = spans.br;
-      if (roll < 0.28) return { x0: viewW + out, y0: viewH + out };
-      if (roll < 0.62) {
-        return { x0: viewW - Math.random() * alongBottom, y0: viewH + out };
-      }
-      return { x0: viewW + out, y0: viewH - Math.random() * alongRight };
-    }
-  }
+function orbitReverseStep() {
+  const o = omega === 0 ? -1 : Math.sign(omega);
+  return -o;
 }
 
-/** 飞出屏幕后在四角外侧补生，再公转进入画面 */
+/** 待补区域内随机取一点（屏内、内切圆外） */
+function randomPointInReplenishZone(): { px: number; py: number } {
+  if (viewW < 24 || viewH < 24) {
+    return { px: viewW * 0.5, py: viewH * 0.5 };
+  }
+  for (let i = 0; i < 48; i++) {
+    const px = Math.random() * viewW;
+    const py = Math.random() * viewH;
+    if (isInReplenishZone(px, py)) return { px, py };
+  }
+  const angle = Math.random() * Math.PI * 2;
+  const r = rOrbitDisk + 6 + Math.random() * Math.min(viewW, viewH) * 0.12;
+  let px = poleX + r * Math.cos(angle);
+  let py = poleY + r * Math.sin(angle);
+  px = Math.max(0, Math.min(viewW, px));
+  py = Math.max(0, Math.min(viewH, py));
+  if (!isInReplenishZone(px, py)) {
+    px = poleX + (rOrbitDisk + 8) * Math.cos(angle);
+    py = poleY + (rOrbitDisk + 8) * Math.sin(angle);
+    px = Math.max(0, Math.min(viewW, px));
+    py = Math.max(0, Math.min(viewH, py));
+  }
+  return { px, py };
+}
+
+function isInsideScreen(x: number, y: number) {
+  return x >= 0 && x <= viewW && y >= 0 && y <= viewH;
+}
+
+/** 将坐标压到「屏外且距边界 < 删星边距」的补星带内 */
+function clampToSpawnExteriorBand(x: number, y: number, out: number): { x0: number; y0: number } {
+  const inner = respawnMargin - 1;
+  let x0 = x;
+  let y0 = y;
+
+  if (isInsideScreen(x0, y0)) {
+    const dl = x0;
+    const dr = viewW - x0;
+    const dt = y0;
+    const db = viewH - y0;
+    const m = Math.min(dl, dr, dt, db);
+    if (m === dl) x0 = -out;
+    else if (m === dr) x0 = viewW + out;
+    else if (m === dt) y0 = -out;
+    else y0 = viewH + out;
+  }
+
+  if (x0 < 0) x0 = Math.max(x0, -inner);
+  if (x0 > viewW) x0 = Math.min(x0, viewW + inner);
+  if (y0 < 0) y0 = Math.max(y0, -inner);
+  if (y0 > viewH) y0 = Math.min(y0, viewH + inner);
+
+  if (x0 >= 0 && x0 <= viewW && y0 >= 0 && y0 <= viewH) {
+    const dl = x0;
+    const dr = viewW - x0;
+    const dt = y0;
+    const db = viewH - y0;
+    const m = Math.min(dl, dr, dt, db);
+    if (m === dl) x0 = -out;
+    else if (m === dr) x0 = viewW + out;
+    else if (m === dt) y0 = -out;
+    else y0 = viewH + out;
+  }
+
+  return { x0, y0 };
+}
+
+/**
+ * 从待补区参考点沿公转反方向走弧长，落在屏外补星带（距边界 < respawnMargin）
+ */
+function spawnPointFromReplenishReference(px: number, py: number): { x0: number; y0: number } {
+  const out = exteriorOutOffset();
+  if (viewW < 40 || viewH < 40) {
+    return { x0: -out, y0: -out };
+  }
+
+  let orbitR = Math.hypot(px - poleX, py - poleY);
+  if (orbitR < 12) orbitR = 12 + Math.random() * 24;
+  let angle = Math.atan2(py - poleY, px - poleX);
+
+  const arcBack = 40 + Math.random() * 110;
+  const rev = orbitReverseStep();
+  angle += rev * (arcBack / orbitR);
+
+  let x = poleX + orbitR * Math.cos(angle);
+  let y = poleY + orbitR * Math.sin(angle);
+
+  const radStep = Math.max(0.012, 18 / orbitR) * rev;
+  let guard = 0;
+  while (isInsideScreen(x, y) && guard < 500) {
+    angle += radStep;
+    x = poleX + orbitR * Math.cos(angle);
+    y = poleY + orbitR * Math.sin(angle);
+    guard++;
+  }
+
+  return clampToSpawnExteriorBand(x, y, out);
+}
+
+function randomReplenishOutsideSpawnPoint(): { x0: number; y0: number } {
+  const { px, py } = randomPointInReplenishZone();
+  return spawnPointFromReplenishReference(px, py);
+}
+
+/** 飞出删星边距后：按待补区反弧长补生在屏外（距边界短于删星边距） */
 function respawnStar(s: Star, isLight: boolean) {
   const dim = s.brightness < 0.5;
-  const { x0, y0 } = randomCornerOutsideSpawnPoint();
+  const { x0, y0 } = randomReplenishOutsideSpawnPoint();
   const fresh = createStar(x0, y0, isLight, dim);
   s.orbitR = fresh.orbitR;
   s.angle = fresh.angle;
@@ -323,10 +390,10 @@ function advanceStar(s: Star, dt: number, isLight: boolean) {
   }
 
   if (
-    s.x < -RESPAWN_OUT_MARGIN ||
-    s.x > viewW + RESPAWN_OUT_MARGIN ||
-    s.y < -RESPAWN_OUT_MARGIN ||
-    s.y > viewH + RESPAWN_OUT_MARGIN
+    s.x < -respawnMargin ||
+    s.x > viewW + respawnMargin ||
+    s.y < -respawnMargin ||
+    s.y > viewH + respawnMargin
   ) {
     respawnStar(s, isLight);
   }

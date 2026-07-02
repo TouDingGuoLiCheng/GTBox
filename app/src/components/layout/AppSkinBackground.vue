@@ -1,6 +1,7 @@
 <script setup lang="ts">
 
 import { computed, watch } from "vue";
+import { useRoute } from "vue-router";
 
 import { GALAXY_SKIN, useAppearanceStore } from "../../stores/appearance";
 import galaxyFallbackUrl from "../../assets/themes/galaxy-bg.png";
@@ -11,6 +12,7 @@ import SkinBackdropMedia from "./SkinBackdropMedia.vue";
 
 
 const appearance = useAppearanceStore();
+const route = useRoute();
 
 
 
@@ -51,7 +53,7 @@ const active = computed(
 const bgUrl = computed(() =>
   appearance.colorScheme === "galaxy"
     ? galaxyFallbackUrl
-    : appearance.getSkinImageUrl(skinConfig.value.backgroundImage),
+    : appearance.skinAppliedPreviewUrl,
 );
 
 
@@ -77,7 +79,7 @@ const watermarkCover = computed(() => {
 /** 预设视频始终静音，用配套 MP3；用户自选视频可走原声 */
 
 const videoMuted = computed(() => {
-
+  if (appearance.toolAudioSuppressed || route.meta.suppressSkinBgm === true) return true;
   if (appearance.colorScheme !== "custom") return true;
 
   if (appearance.skinPresetId) return true;
@@ -125,9 +127,8 @@ watch(
   >
 
     <SkinBackdropMedia
-
+      :key="bgUrl ?? 'none'"
       class="h-full w-full transition-[filter,transform] duration-300"
-
       :src="bgUrl"
 
       :blur="effectiveSkinConfig.blur"

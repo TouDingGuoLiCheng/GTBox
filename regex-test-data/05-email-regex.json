@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "split_pattern_1",
+      "type": "split_pattern",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "params": {
+        "separator": "@",
+        "parts": 2
+      }
+    },
+    {
+      "id": "contains_2",
+      "type": "contains",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "params": {
+        "text": ".",
+        "ignoreCase": false
+      }
+    },
+    {
+      "id": "and_3",
+      "type": "and",
+      "position": {
+        "x": 180,
+        "y": 120
+      },
+      "params": {}
+    },
+    {
+      "id": "scope_4",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_5",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_split_and",
+      "source": "split_pattern_1",
+      "sourceHandle": "out",
+      "target": "and_3",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_dot_and",
+      "source": "contains_2",
+      "sourceHandle": "out",
+      "target": "and_3",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_predicate",
+      "source": "and_3",
+      "sourceHandle": "out",
+      "target": "scope_4",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_root",
+      "source": "scope_4",
+      "sourceHandle": "bool",
+      "target": "root_5",
+      "targetHandle": "in"
+    }
+  ]
+}

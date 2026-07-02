@@ -1,0 +1,211 @@
+.fretboard-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: #050505;
+  padding: 0.75rem;
+  user-select: none;
+  -webkit-user-select: none;
+  contain: layout style;
+}
+
+.fretboard-scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  contain: strict;
+}
+
+.fretboard-board {
+  position: relative;
+  display: grid;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgb(255 255 255 / 0.85);
+  background: #000;
+  contain: layout size;
+}
+
+.board-corner,
+.board-nut-spacer,
+.fret-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+  color: rgb(161 161 170);
+  font-size: 10px;
+}
+
+.fret-head--marker {
+  color: rgb(250 204 21 / 0.85);
+}
+
+.board-nut {
+  display: block;
+  min-height: 0;
+  height: 100%;
+  background: rgb(255 255 255 / 0.92);
+  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+}
+
+.fret-cell {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  height: 100%;
+  border: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.55);
+  border-right: 1px solid rgb(255 255 255 / 0.35);
+  background: transparent;
+  color: rgb(250 250 250);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+  touch-action: manipulation;
+}
+
+.fret-cell--plain:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.fret-inlay-layer {
+  position: absolute;
+  top: 26px;
+  left: 44px;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--max-fret, 22), minmax(0, 1fr));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fret-inlay-col {
+  position: relative;
+}
+
+.fret-inlay-col--marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fret-inlay-col--double {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 8% 0;
+}
+
+.fret-inlay-dot--single {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(161 161 170 / 0.82);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
+}
+
+.fret-inlay-dot--octave {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgb(244 244 245 / 0.95);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.5),
+    0 0 8px rgb(250 204 21 / 0.22);
+}
+
+.fretboard-shell--training .fret-head {
+  color: transparent;
+}
+
+.fretboard-shell--training .fret-head--marker {
+  color: transparent;
+}
+
+.fret-cell--open {
+  border-right: none;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.fret-cell:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.fret-cell--selected {
+  background: rgb(250 204 21 / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(250 204 21 / 0.9);
+}
+
+.fret-cell--correct {
+  background: rgb(34 197 94 / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(74 222 128 / 0.85);
+}
+
+.fret-cell--wrong {
+  background: rgb(244 63 94 / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(251 113 133 / 0.9);
+}
+
+.fret-cell--enharmonic {
+  background: rgb(34 197 94 / 0.18);
+  box-shadow: inset 0 0 0 1px rgb(74 222 128 / 0.65);
+}
+
+.fret-cell:focus-visible {
+  outline: 2px solid rgb(250 204 21 / 0.8);
+  outline-offset: -2px;
+}
+
+.degree-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.degree-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.degree-label--chromatic .degree-text {
+  font-size: 12px;
+  color: rgb(212 212 216 / 0.75);
+}
+
+.degree-dot {
+  font-size: 10px;
+  line-height: 1;
+  color: rgb(228 228 231);
+}
+
+.degree-dot--above {
+  margin-bottom: -2px;
+}
+
+.degree-label--note .degree-text {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.fret-cell--do-anchor {
+  background: rgb(250 204 21 / 0.32);
+  box-shadow: inset 0 0 0 2px rgb(250 204 21 / 0.95);
+}

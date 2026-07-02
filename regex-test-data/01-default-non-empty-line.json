@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "non_empty_3",
+      "type": "non_empty",
+      "position": {
+        "x": -40,
+        "y": 80
+      },
+      "params": {}
+    },
+    {
+      "id": "and_2",
+      "type": "and",
+      "position": {
+        "x": 120,
+        "y": 120
+      },
+      "params": {}
+    },
+    {
+      "id": "scope_1",
+      "type": "scope",
+      "position": {
+        "x": 280,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_4",
+      "type": "root",
+      "position": {
+        "x": 480,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_5",
+      "source": "non_empty_3",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_6",
+      "source": "and_2",
+      "sourceHandle": "out",
+      "target": "scope_1",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_7",
+      "source": "scope_1",
+      "sourceHandle": "bool",
+      "target": "root_4",
+      "targetHandle": "in"
+    }
+  ]
+}

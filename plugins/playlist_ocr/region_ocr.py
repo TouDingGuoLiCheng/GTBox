@@ -25,16 +25,59 @@ def emit_json(payload: Any) -> None:
 _EXTRACT_MODULE_NAME = "toolbox_extract_playlist"
 
 
+def _candidate_extract_paths(workspace_root: str) -> list[Path]:
+    """按优先级返回可能的 extract_playlist.py 位置。
+    1) 仓库内置 app/workspaces/music_crawl/playlist_ocr/（最可信，跟随工具箱发布）
+    2) 用户配置 workspace_root/playlist_ocr/（向后兼容）
+    3) 用户配置 workspace_root/music_crawl/playlist_ocr/
+    """
+    candidates: list[Path] = []
+
+    # 当前脚本位于 plugins/playlist_ocr/region_ocr.py，上溯到仓库根
+    here = Path(__file__).resolve()
+    toolbox_root = here.parent.parent.parent
+    repo_path = (
+        toolbox_root
+        / "app"
+        / "workspaces"
+        / "music_crawl"
+        / "playlist_ocr"
+        / "extract_playlist.py"
+    )
+    candidates.append(repo_path)
+
+    if workspace_root:
+        ws = Path(workspace_root)
+        candidates.append(ws / "playlist_ocr" / "extract_playlist.py")
+        candidates.append(ws / "music_crawl" / "playlist_ocr" / "extract_playlist.py")
+
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for p in candidates:
+        key = str(p).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(p)
+    return uniq
+
+
 def load_extract_playlist(workspace_root: str) -> Any:
     cached = sys.modules.get(_EXTRACT_MODULE_NAME)
     if cached is not None:
         return cached
 
-    module_path = Path(workspace_root) / "playlist_ocr" / "extract_playlist.py"
-    if not module_path.exists():
+    module_path: Path | None = None
+    for cand in _candidate_extract_paths(workspace_root):
+        if cand.exists():
+            module_path = cand
+            break
+
+    if module_path is None:
+        tried = "\n  ".join(str(p) for p in _candidate_extract_paths(workspace_root))
         raise SystemExit(
-            f"未找到 extract_playlist.py: {module_path}。"
-            "请在设置中将工作区指向本仓库的 workspaces/music_crawl 目录（含 playlist_ocr/）。"
+            f"未找到 extract_playlist.py，已尝试:\n  {tried}\n"
+            "请确认仓库 app/workspaces/music_crawl/playlist_ocr/ 完整。"
         )
 
     playlist_dir = str(module_path.parent)
@@ -68,6 +111,8 @@ def row_bbox(
     pair_index: int | None = None,
     note: str | None = None,
     y_offset: float = 0,
+    image_width: int = 0,
+    image_height: int = 0,
 ) -> dict[str, Any]:
     item: dict[str, Any] = {
         "x": float(row.x1),
@@ -82,6 +127,10 @@ def row_bbox(
         item["pairIndex"] = pair_index
     if note:
         item["note"] = note
+    if image_width > 0:
+        item["imageWidth"] = int(image_width)
+    if image_height > 0:
+        item["imageHeight"] = int(image_height)
     return item
 
 
@@ -120,18 +169,35 @@ def _pair_rows(
     return pairs, unpaired
 
 
+def _resolve_layout_cfg(workspace_root: str) -> Path:
+    """与 _candidate_extract_paths 同思路，定位 qq_music_layout.yaml。"""
+    here = Path(__file__).resolve()
+    toolbox_root = here.parent.parent.parent
+    candidates = [
+        toolbox_root / "app" / "workspaces" / "music_crawl" / "playlist_ocr" / "qq_music_layout.yaml",
+    ]
+    if workspace_root:
+        ws = Path(workspace_root)
+        candidates.append(ws / "playlist_ocr" / "qq_music_layout.yaml")
+        candidates.append(ws / "music_crawl" / "playlist_ocr" / "qq_music_layout.yaml")
+    for c in candidates:
+        if c.exists():
+            return c
+    tried = "\n  ".join(str(p) for p in candidates)
+    raise SystemExit(f"未找到布局配置 qq_music_layout.yaml，已尝试:\n  {tried}")
+
+
 def run_detect_playlist(ocr: Any, image: np.ndarray, workspace_root: str) -> list[dict[str, Any]]:
     """与 extract_playlist --debug 一致：仅输出配对行（绿/橙）与未配对行（蓝）。"""
     ep = load_extract_playlist(workspace_root)
-    cfg_path = Path(workspace_root) / "playlist_ocr" / "qq_music_layout.yaml"
-    if not cfg_path.exists():
-        raise SystemExit(f"未找到布局配置: {cfg_path}")
+    cfg_path = _resolve_layout_cfg(workspace_root)
 
     cfg = ep.load_yaml(cfg_path)
-    y_offset = float(status_bar_crop_y_offset(image.shape[0], cfg))
+    original_h, original_w = image.shape[:2]
+    y_offset = float(status_bar_crop_y_offset(original_h, cfg))
     img = ep.apply_status_bar_crop(image.copy(), cfg)
     image_h, image_w = img.shape[:2]
-    dummy_path = Path(workspace_root) / "playlist_ocr" / "_ui_preview.png"
+    dummy_path = cfg_path.parent / "_ui_preview.png"
 
     raw = ep.run_ocr(ocr, img, dummy_path)
     boxes = ep.filter_layout_boxes(
@@ -144,10 +210,19 @@ def run_detect_playlist(ocr: Any, image: np.ndarray, workspace_root: str) -> lis
 
     out: list[dict[str, Any]] = []
     for idx, (top, bot) in enumerate(pairs, start=1):
-        out.append(row_bbox(top, "title", pair_index=idx, y_offset=y_offset))
-        out.append(row_bbox(bot, "artist", pair_index=idx, y_offset=y_offset))
+        out.append(
+            row_bbox(top, "title", pair_index=idx, y_offset=y_offset,
+                     image_width=original_w, image_height=original_h)
+        )
+        out.append(
+            row_bbox(bot, "artist", pair_index=idx, y_offset=y_offset,
+                     image_width=original_w, image_height=original_h)
+        )
     for reason, row in unpaired:
-        out.append(row_bbox(row, "unpaired", note=str(reason)[:32], y_offset=y_offset))
+        out.append(
+            row_bbox(row, "unpaired", note=str(reason)[:32], y_offset=y_offset,
+                     image_width=original_w, image_height=original_h)
+        )
     return out
 
 

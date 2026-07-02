@@ -1,0 +1,88 @@
+/* 规则图编辑器 — 半透明哑光材质 */
+
+.rule-graph-editor {
+  --rule-port-predicate: #1d4ed8;
+  --rule-port-segment: #15803d;
+  --rule-structure-border: #1e40af;
+  --rule-segment-border: #166534;
+}
+
+.ui-matte-panel {
+  background: rgb(20 20 26 / 0.48);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  backdrop-filter: blur(12px) saturate(115%);
+  -webkit-backdrop-filter: blur(12px) saturate(115%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 10px 28px rgb(0 0 0 / 0.22);
+}
+
+.ui-matte-panel-header {
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  background: rgb(255 255 255 / 0.03);
+}
+
+.ui-matte-canvas {
+  background: rgb(10 10 14 / 0.36);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(16px) saturate(110%);
+  -webkit-backdrop-filter: blur(16px) saturate(110%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    inset 0 0 48px rgb(0 0 0 / 0.12),
+    0 12px 32px rgb(0 0 0 / 0.2);
+}
+
+.ui-matte-chip {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.ui-matte-node {
+  background: rgb(30 30 38 / 0.68);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 6px 18px rgb(0 0 0 / 0.28);
+}
+
+.rule-graph-editor :deep(.vue-flow) {
+  background: transparent !important;
+}
+
+.rule-graph-editor :deep(.vue-flow__background) {
+  opacity: 0.28;
+}
+
+.rule-graph-editor :deep(.vue-flow__controls) {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(24 24 30 / 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.rule-graph-editor :deep(.vue-flow__controls-button) {
+  border: none;
+  background: transparent;
+  color: rgb(161 161 170);
+}
+
+.rule-graph-editor :deep(.vue-flow__controls-button:hover) {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.rule-graph-editor :deep(.vue-flow__edge-path) {
+  stroke: rgb(255 255 255 / 0.22);
+}
+
+.rule-graph-editor :deep(.vue-flow__connection-path) {
+  stroke: var(--rule-port-predicate);
+}

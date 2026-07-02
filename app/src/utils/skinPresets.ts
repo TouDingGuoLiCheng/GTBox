@@ -1,6 +1,12 @@
 import type { CustomSkin, ThemeColors } from "../stores/appearance";
 
-export type SkinPresetId = "preset-clouds";
+export type SkinPresetId =
+  | "preset-clouds"
+  | "preset-train"
+  | "preset-wheat"
+  | "preset-peaceful"
+  | "preset-flower"
+  | "preset-eye";
 
 export interface SkinWatermarkCover {
   /** 像素定位（相对 refWidth/refHeight 全屏参考） */
@@ -65,7 +71,7 @@ export const SKIN_PRESET_CLOUDS: SkinPresetDefinition = {
     fontColor: "light",
     cardMaterial: "acrylic",
     titleMaterial: "plain",
-    cardOpacity: 40,
+    cardOpacity: 0,
     cardBlur: 18,
     cardBorderOpacity: 12,
     titleOpacity: 0,
@@ -83,8 +89,178 @@ export const SKIN_PRESET_CLOUDS: SkinPresetDefinition = {
   },
 };
 
+/** 夕阳列车视频 + 暖橙 UI */
+export const SKIN_PRESET_TRAIN: SkinPresetDefinition = {
+  id: "preset-train",
+  label: "夕阳列车",
+  description: "车窗夕照循环背景，暖色毛玻璃卡片与琥珀强调色",
+  icon: "mdi:train",
+  workspaceSubpath: "skin-presets/train.mp4",
+  bgmWorkspaceSubpath: "skin-presets/train-bgm.mp3",
+  bgmDisplay: { title: "Endless", artist: "Lena Raine" },
+  colors: {
+    accent: "#e8a060",
+    surface: "#120c08",
+    surfaceElevated: "#221810",
+  },
+  skin: {
+    blur: 0,
+    maskOpacity: 0,
+    brightness: 96,
+    scale: 1.05,
+    fontColor: "light",
+    cardMaterial: "acrylic",
+    titleMaterial: "plain",
+    cardOpacity: 0,
+    cardBlur: 18,
+    cardBorderOpacity: 12,
+    titleOpacity: 0,
+    titleBlur: 0,
+    titleTextShadow: true,
+    keepVideoAudio: false,
+  },
+  watermark: null,
+};
+
+/** 麦田远山视频 + 青绿 UI */
+export const SKIN_PRESET_WHEAT: SkinPresetDefinition = {
+  id: "preset-wheat",
+  label: "麦田远山",
+  description: "田野山峦循环背景，清透毛玻璃卡片与青绿强调色",
+  icon: "mdi:image-filter-hdr",
+  workspaceSubpath: "skin-presets/wheat.mp4",
+  bgmWorkspaceSubpath: "skin-presets/wheat-bgm.mp3",
+  bgmDisplay: { title: "男子高校生と少年時代", artist: "Audio Highs" },
+  colors: {
+    accent: "#6ec8a0",
+    surface: "#080c0a",
+    surfaceElevated: "#142018",
+  },
+  skin: {
+    blur: 0,
+    maskOpacity: 0,
+    brightness: 94,
+    scale: 1.04,
+    fontColor: "light",
+    cardMaterial: "acrylic",
+    titleMaterial: "plain",
+    cardOpacity: 0,
+    cardBlur: 18,
+    cardBorderOpacity: 12,
+    titleOpacity: 0,
+    titleBlur: 0,
+    titleTextShadow: true,
+    keepVideoAudio: false,
+  },
+  watermark: null,
+};
+
+/** 云野乡村视频 + 浅灰 UI */
+export const SKIN_PRESET_PEACEFUL: SkinPresetDefinition = {
+  id: "preset-peaceful",
+  label: "云野乡村",
+  description: "乡野云雾循环背景，轻盈毛玻璃卡片与雾蓝强调色",
+  icon: "mdi:blur-linear",
+  workspaceSubpath: "skin-presets/peaceful.mp4",
+  bgmWorkspaceSubpath: "skin-presets/peaceful-bgm.mp3",
+  bgmDisplay: { title: "Old Man Voll", artist: "Evan Call" },
+  colors: {
+    accent: "#9ab0c8",
+    surface: "#0c0e12",
+    surfaceElevated: "#181c22",
+  },
+  skin: {
+    blur: 0,
+    maskOpacity: 0,
+    brightness: 98,
+    scale: 1.03,
+    fontColor: "light",
+    cardMaterial: "acrylic",
+    titleMaterial: "plain",
+    cardOpacity: 0,
+    cardBlur: 16,
+    cardBorderOpacity: 10,
+    titleOpacity: 0,
+    titleBlur: 0,
+    titleTextShadow: true,
+    keepVideoAudio: false,
+  },
+  watermark: null,
+};
+
+/** 白花晨光视频 + 柔粉 UI（亮色背景，深色字体） */
+export const SKIN_PRESET_FLOWER: SkinPresetDefinition = {
+  id: "preset-flower",
+  label: "白花晨光",
+  description: "晨光花影循环背景，通透卡片与淡粉强调色",
+  icon: "mdi:flower-outline",
+  workspaceSubpath: "skin-presets/flower.mp4",
+  bgmWorkspaceSubpath: "skin-presets/flower-bgm.mp3",
+  bgmDisplay: { title: "Comforting Memories", artist: "Kumi Tanioka" },
+  colors: {
+    accent: "#c06080",
+    surface: "#f8f6f4",
+    surfaceElevated: "#ffffff",
+  },
+  skin: {
+    blur: 0,
+    maskOpacity: 0,
+    brightness: 96,
+    scale: 1.05,
+    fontColor: "dark",
+    cardMaterial: "acrylic",
+    titleMaterial: "plain",
+    cardOpacity: 0,
+    cardBlur: 18,
+    cardBorderOpacity: 12,
+    titleOpacity: 0,
+    titleBlur: 0,
+    titleTextShadow: true,
+    keepVideoAudio: false,
+  },
+  watermark: null,
+};
+
+/** 你的眼眸视频 + 金琥珀 UI */
+export const SKIN_PRESET_EYE: SkinPresetDefinition = {
+  id: "preset-eye",
+  label: "你的眼眸",
+  description: "动漫眼眸循环背景，通透毛玻璃卡片与金琥珀强调色",
+  icon: "mdi:eye-outline",
+  workspaceSubpath: "skin-presets/eye.mp4",
+  bgmWorkspaceSubpath: "skin-presets/eye-bgm.mp3",
+  bgmDisplay: { title: "Always Watching Over You", artist: "Evan Call" },
+  colors: {
+    accent: "#d8b050",
+    surface: "#100e08",
+    surfaceElevated: "#201c14",
+  },
+  skin: {
+    blur: 0,
+    maskOpacity: 0,
+    brightness: 95,
+    scale: 1.06,
+    fontColor: "light",
+    cardMaterial: "acrylic",
+    titleMaterial: "plain",
+    cardOpacity: 0,
+    cardBlur: 18,
+    cardBorderOpacity: 12,
+    titleOpacity: 0,
+    titleBlur: 0,
+    titleTextShadow: true,
+    keepVideoAudio: false,
+  },
+  watermark: null,
+};
+
 export const SKIN_PRESETS: Record<SkinPresetId, SkinPresetDefinition> = {
   "preset-clouds": SKIN_PRESET_CLOUDS,
+  "preset-train": SKIN_PRESET_TRAIN,
+  "preset-wheat": SKIN_PRESET_WHEAT,
+  "preset-peaceful": SKIN_PRESET_PEACEFUL,
+  "preset-flower": SKIN_PRESET_FLOWER,
+  "preset-eye": SKIN_PRESET_EYE,
 };
 
 export const SKIN_PRESET_LIST = Object.values(SKIN_PRESETS);

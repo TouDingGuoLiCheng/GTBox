@@ -18,9 +18,7 @@ const appearance = useAppearanceStore();
 const fileInputRef = useTemplateRef<HTMLInputElement>("fileInput");
 
 const draft = computed(() => appearance.skinDraft);
-const previewUrl = computed(() =>
-  appearance.getSkinImageUrl(draft.value.backgroundImage),
-);
+const previewUrl = computed(() => appearance.skinDraftPreviewUrl);
 
 const previewWatermark = computed(() => {
   if (!appearance.skinPresetId) return null;
@@ -55,7 +53,7 @@ const titleMaterialOptions: { id: TitleMaterial; label: string }[] = [
 ];
 
 const cardTuneSliders = [
-  { key: "cardOpacity" as const, label: "透明度", min: 20, max: 95, step: 1, format: (v: number) => `${v}%` },
+  { key: "cardOpacity" as const, label: "透明度", min: 0, max: 95, step: 1, format: (v: number) => `${v}%` },
   { key: "cardBlur" as const, label: "模糊", min: 0, max: 32, step: 1, format: (v: number) => `${v}px` },
   { key: "cardBorderOpacity" as const, label: "描边", min: 0, max: 40, step: 1, format: (v: number) => `${v}%` },
 ];
@@ -82,6 +80,8 @@ const materialSceneMaskStyle = computed(() => ({
     ? `rgba(0, 0, 0, ${draft.value.maskOpacity / 100})`
     : "transparent",
 }));
+
+const materialPreviewBlur = computed(() => Math.min(draft.value.blur, 8));
 
 const previewCardStyle = computed(() => ({
   backgroundColor: `rgba(${previewRgb.value}, ${draft.value.cardOpacity / 100})`,
@@ -197,6 +197,7 @@ function onFileChange(event: Event) {
               >
                 <SkinBackdropMedia
                   v-if="previewUrl"
+                  :key="previewUrl"
                   class="absolute inset-0"
                   :src="previewUrl"
                   :blur="draft.blur"
@@ -303,15 +304,18 @@ function onFileChange(event: Event) {
             <div class="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4 md:px-6 md:py-5">
               <section class="mb-6">
                 <div
-                  class="relative aspect-video w-full max-h-[154px] shrink-0 overflow-hidden rounded-xl border border-white/10"
+                  class="relative aspect-video w-full max-h-[154px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900"
                 >
                   <SkinBackdropMedia
                     v-if="previewUrl"
+                    :key="previewUrl"
                     class="absolute inset-0"
                     :src="previewUrl"
-                    :blur="Math.min(draft.blur, 8)"
+                    :blur="materialPreviewBlur"
                     :brightness="draft.brightness"
                     :scale="draft.scale"
+                    :watermark-cover="previewWatermark"
+                    video-muted
                     debug-tag="skin-dialog-material-preview"
                     fit="cover"
                   />

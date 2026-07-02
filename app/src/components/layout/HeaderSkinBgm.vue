@@ -24,7 +24,10 @@ const label = computed(() => {
     class="header-skin-bgm pointer-events-none flex h-11 max-w-[min(42vw,16rem)] items-center gap-1.5 px-2"
     aria-hidden="true"
   >
-    <VinylDiscIcon class="header-skin-bgm__disc shrink-0" />
+    <VinylDiscIcon
+      class="header-skin-bgm__disc shrink-0"
+      :class="{ 'header-skin-bgm__disc--spinning': appearance.skinBgmPlaying }"
+    />
     <span class="header-skin-bgm__label min-w-0 truncate text-xs text-zinc-400">
       {{ label }}
     </span>

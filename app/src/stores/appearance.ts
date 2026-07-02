@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
@@ -16,6 +16,12 @@ import {
   setMediaDebugEnabled,
 } from "../utils/mediaDebug";
 import { isVideoSkinPath, SKIN_BACKGROUND_EXTENSIONS } from "../utils/skinMedia";
+import {
+  deleteCachedDisplayUrl,
+  isWorkspaceSkinSubpath,
+  resolveSkinDisplayUrl,
+  skinMediaCacheKey,
+} from "../utils/skinDisplayUrl";
 import type { SkinPresetBgmDisplay } from "../utils/skinPresets";
 
 export type { SkinPresetId } from "../utils/skinPresets";
@@ -43,7 +49,7 @@ export interface UiPreferences {
   desktopPeekHideCreative: boolean;
   /** 主界面：隐藏侧栏、标题与工具卡片，仅留背景 */
   contentUiHidden: boolean;
-  /** 右下角媒体调试终端浮层 */
+  /** 右下角调试终端浮层 */
   mediaDebugOverlay: boolean;
   /** 诊断：禁用主题遮罩与滤镜，仅显示原图/原视频 */
   disableSkinFxForDebug: boolean;
@@ -339,12 +345,31 @@ function normalizeCustomSkinBgm(raw?: Partial<CustomSkinBgm>): CustomSkinBgm {
 }
 
 function normalizeCustomSkin(raw?: Partial<CustomSkin>): CustomSkin {
+  let backgroundImage = raw?.backgroundImage ?? null;
+  if (
+    typeof backgroundImage === "string" &&
+    (backgroundImage.startsWith("data:") || backgroundImage.startsWith("blob:"))
+  ) {
+    backgroundImage = null;
+  }
   return {
     ...DEFAULT_SKIN,
     ...raw,
+    backgroundImage,
     keepVideoAudio: Boolean(raw?.keepVideoAudio ?? DEFAULT_SKIN.keepVideoAudio),
     bgm: normalizeCustomSkinBgm(raw?.bgm),
   };
+}
+
+function skinForPersist(skin: CustomSkin): CustomSkin {
+  const bg = skin.backgroundImage;
+  if (
+    typeof bg === "string" &&
+    (bg.startsWith("data:") || bg.startsWith("blob:"))
+  ) {
+    return { ...skin, backgroundImage: null };
+  }
+  return skin;
 }
 
 export function isCustomSkinVideoBackground(
@@ -379,10 +404,6 @@ const IMPLEMENTED_CREATIVE_EFFECTS: CreativeBackgroundEffect[] = [
   "ascii-art",
   "rain-ripples",
 ];
-
-function isWorkspaceSkinSubpath(path: string): boolean {
-  return /^skin-(presets|custom)\//i.test(path) || /^creative\//i.test(path);
-}
 
 function normalizeCreativeBackground(
   raw?: Partial<CreativeBackgroundSettings> & { effect?: string },
@@ -445,8 +466,9 @@ function loadState(): AppearanceState {
         : "dark",
       customColors: { ...DEFAULT_CUSTOM, ...parsed.customColors },
       customSkin: normalizeCustomSkin(parsed.customSkin),
-      skinPresetId:
-        parsed.skinPresetId === "preset-clouds" ? "preset-clouds" : null,
+      skinPresetId: getSkinPreset(parsed.skinPresetId as SkinPresetId)
+        ? (parsed.skinPresetId as SkinPresetId)
+        : null,
       skinPresetBgm: normalizeSkinPresetBgm(parsed.skinPresetBgm),
       uiPreferences: normalizeUiPreferences(parsed.uiPreferences),
       creativeBackground: normalizeCreativeBackground(parsed.creativeBackground),
@@ -512,11 +534,6 @@ function cloneSkin(skin: CustomSkin): CustomSkin {
     ...skin,
     bgm: { ...skin.bgm },
   };
-}
-
-function normalizeSkinMediaPath(path: string): string {
-  // 兼容 Windows 长路径前缀和反斜杠，避免 convertFileSrc 解析异常
-  return path.replace(/^\\\\\?\\/, "").replace(/\\/g, "/");
 }
 
 const VALID_COLOR_SCHEMES: ColorScheme[] = [
@@ -606,30 +623,7 @@ function applyToDocument(
   root.dataset.fontColor = activeSkin ? activeSkinConfig.fontColor : "";
   root.dataset.skinPreset = scheme === "custom" && skinPresetId ? skinPresetId : "";
 
-  if (activeSkin && activeSkinConfig.backgroundImage) {
-    const normalized = normalizeSkinMediaPath(activeSkinConfig.backgroundImage);
-    let url = normalized;
-    if (
-      !url.startsWith("data:") &&
-      !url.startsWith("blob:") &&
-      !url.startsWith("/") &&
-      !url.startsWith("http://") &&
-      !url.startsWith("https://")
-    ) {
-      try {
-        url = convertFileSrc(normalized);
-      } catch {
-        url = normalized;
-      }
-    }
-    if (url && !isVideoSkinPath(normalized)) {
-      root.style.setProperty("--skin-bg-url", `url("${url}")`);
-    } else {
-      root.style.removeProperty("--skin-bg-url");
-    }
-  } else {
-    root.style.removeProperty("--skin-bg-url");
-  }
+  root.style.removeProperty("--skin-bg-url");
 
   root.style.setProperty("--skin-blur", `${activeSkinConfig.blur}px`);
   root.style.setProperty(
@@ -720,11 +714,25 @@ export const useAppearanceStore = defineStore("appearance", () => {
   const skinPresetBgm = ref<SkinPresetBgmSettings>({ ...saved.skinPresetBgm });
   const skinBgmSyncNonce = ref(0);
   const skinBgmPlaying = ref(false);
+  const toolAudioSuppressed = ref(false);
 
   function setSkinBgmPlaying(playing: boolean) {
     skinBgmPlaying.value = playing;
   }
+
+  function setToolAudioSuppressed(suppressed: boolean) {
+    toolAudioSuppressed.value = suppressed;
+  }
   const skinDialogOpen = ref(false);
+  /** 对话框预览用显示 URL（由 backgroundImage 异步解析，避免重复 convertFileSrc） */
+  const skinDraftPreviewUrl = ref<string | null>(null);
+  /** 已应用皮肤的显示 URL */
+  const skinAppliedPreviewUrl = ref<string | null>(null);
+  let draftBlobUrl: string | null = null;
+  let lastDraftBgPath: string | null = null;
+  let lastAppliedBgPath: string | null = null;
+  let lastDraftCacheKey: string | null = null;
+  let lastAppliedCacheKey: string | null = null;
   const uiPreferences = ref<UiPreferences>({ ...saved.uiPreferences });
   setMediaDebugEnabled(uiPreferences.value.mediaDebugOverlay);
   const creativeBackground = ref<CreativeBackgroundSettings>({
@@ -802,25 +810,75 @@ export const useAppearanceStore = defineStore("appearance", () => {
     }
   }
 
-  async function ensureSkinMediaResolved() {
-    const bg = customSkin.value.backgroundImage;
-    if (bg && isWorkspaceSkinSubpath(bg)) {
-      const abs = await resolveWorkspaceSkinPath(bg);
-      if (abs && abs !== bg) {
-        customSkin.value = { ...customSkin.value, backgroundImage: abs };
-        skinDraft.value = cloneSkin(customSkin.value);
-        logAppearance("resolve-skin-media-path", {
-          from: briefPath(bg),
-          to: briefPath(abs),
-        });
-      }
+  function revokeDraftBlobUrl() {
+    if (draftBlobUrl) {
+      URL.revokeObjectURL(draftBlobUrl);
+      draftBlobUrl = null;
     }
+  }
+
+  async function refreshDraftPreviewUrl() {
+    const path = skinDraft.value.backgroundImage;
+    if (path !== lastDraftBgPath) {
+      if (lastDraftCacheKey) deleteCachedDisplayUrl(lastDraftCacheKey);
+      lastDraftBgPath = path;
+      lastDraftCacheKey = null;
+    }
+    if (!path) {
+      revokeDraftBlobUrl();
+      skinDraftPreviewUrl.value = null;
+      return;
+    }
+    if (path.startsWith("blob:")) {
+      skinDraftPreviewUrl.value = path;
+      lastDraftCacheKey = path;
+      return;
+    }
+    skinDraftPreviewUrl.value = await resolveSkinDisplayUrl(
+      path,
+      resolveWorkspaceSkinPath,
+    );
+    lastDraftCacheKey = await skinMediaCacheKey(path, resolveWorkspaceSkinPath);
+  }
+
+  async function refreshAppliedPreviewUrl() {
+    const path = customSkin.value.backgroundImage;
+    if (path !== lastAppliedBgPath) {
+      if (lastAppliedCacheKey) deleteCachedDisplayUrl(lastAppliedCacheKey);
+      lastAppliedBgPath = path;
+      lastAppliedCacheKey = null;
+    }
+    if (!path) {
+      skinAppliedPreviewUrl.value = null;
+      return;
+    }
+    skinAppliedPreviewUrl.value = await resolveSkinDisplayUrl(
+      path,
+      resolveWorkspaceSkinPath,
+    );
+    lastAppliedCacheKey = await skinMediaCacheKey(path, resolveWorkspaceSkinPath);
+  }
+
+  async function ingestBackgroundToWorkspace(sourceAbs: string): Promise<string> {
+    const name = sourceAbs.split(/[/\\]/).pop() ?? "background.png";
+    const extMatch = name.match(/\.([a-zA-Z0-9]+)$/i);
+    const ext = (extMatch?.[1] ?? "png").toLowerCase();
+    const subpath = `skin-custom/background.${ext}`;
+    await invoke<string>("copy_file_to_workspaces", {
+      sourceAbs,
+      subpath,
+    });
+    return subpath;
+  }
+
+  async function ensureSkinMediaResolved() {
     if (
       !skinPresetId.value &&
       customSkin.value.backgroundImage?.toLowerCase().includes("cloud.mp4")
     ) {
       skinPresetId.value = "preset-clouds";
     }
+    await refreshAppliedPreviewUrl();
   }
 
   async function applySkinPreset(id: SkinPresetId) {
@@ -853,6 +911,7 @@ export const useAppearanceStore = defineStore("appearance", () => {
     clearDesktopPeekIfBlocked();
     applyTheme();
     persist();
+    await refreshAppliedPreviewUrl();
     skinDialogOpen.value = false;
     requestSkinBgmSync();
     logAppearance("apply-skin-preset", {
@@ -871,7 +930,7 @@ export const useAppearanceStore = defineStore("appearance", () => {
       JSON.stringify({
         colorScheme: colorScheme.value,
         customColors: customColors.value,
-        customSkin: customSkin.value,
+        customSkin: skinForPersist(customSkin.value),
         skinPresetId: skinPresetId.value,
         skinPresetBgm: skinPresetBgm.value,
         uiPreferences: uiPreferences.value,
@@ -995,7 +1054,9 @@ export const useAppearanceStore = defineStore("appearance", () => {
     } else {
       skinDraft.value = cloneSkin(DEFAULT_SKIN);
     }
+    lastDraftBgPath = skinDraft.value.backgroundImage;
     skinDialogOpen.value = true;
+    void refreshDraftPreviewUrl();
     logAppearance("open-skin-dialog", {
       scheme: colorScheme.value,
       presetId: skinPresetId.value,
@@ -1005,6 +1066,10 @@ export const useAppearanceStore = defineStore("appearance", () => {
 
   function closeSkinDialog() {
     skinDialogOpen.value = false;
+    revokeDraftBlobUrl();
+    skinDraft.value = cloneSkin(customSkin.value);
+    lastDraftBgPath = skinDraft.value.backgroundImage;
+    skinDraftPreviewUrl.value = skinAppliedPreviewUrl.value;
     logAppearance("close-skin-dialog");
   }
 
@@ -1082,6 +1147,7 @@ export const useAppearanceStore = defineStore("appearance", () => {
     } else {
       patchSkinDraft({ backgroundImage: path, keepVideoAudio: false });
     }
+    void refreshDraftPreviewUrl();
   }
 
   function canPickCustomSkinBgm(useDraft = false): boolean {
@@ -1181,23 +1247,16 @@ export const useAppearanceStore = defineStore("appearance", () => {
 
   function getSkinImageUrl(path: string | null): string | null {
     if (!path) return null;
-    const normalized = normalizeSkinMediaPath(path);
-    // 打包资源（银河壁纸等）、data/blob、http — 勿走 convertFileSrc
-    if (
-      normalized.startsWith("data:") ||
-      normalized.startsWith("blob:") ||
-      normalized.startsWith("http://") ||
-      normalized.startsWith("https://") ||
-      normalized.startsWith("/") ||
-      normalized.startsWith("asset://")
-    ) {
-      return normalized;
+    if (path === GALAXY_THEME_BG || path.startsWith("/") || path.includes("assets/")) {
+      return path;
     }
-    try {
-      return convertFileSrc(normalized);
-    } catch {
-      return normalized;
+    if (path === skinDraft.value.backgroundImage && skinDialogOpen.value) {
+      return skinDraftPreviewUrl.value;
     }
+    if (path === customSkin.value.backgroundImage) {
+      return skinAppliedPreviewUrl.value;
+    }
+    return null;
   }
 
   function activeSkinPreset() {
@@ -1234,14 +1293,13 @@ export const useAppearanceStore = defineStore("appearance", () => {
   }
 
   function setBackgroundFromFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        skinPresetId.value = null;
-        afterBackgroundPicked(reader.result, true);
-      }
-    };
-    reader.readAsDataURL(file);
+    revokeDraftBlobUrl();
+    draftBlobUrl = URL.createObjectURL(file);
+    skinPresetId.value = null;
+    afterBackgroundPicked(draftBlobUrl, true);
+    skinDraftPreviewUrl.value = draftBlobUrl;
+    lastDraftBgPath = draftBlobUrl;
+    logAppearance("background-picked-file-input", { size: file.size, type: file.type });
   }
 
   async function pickBackgroundImage() {
@@ -1257,17 +1315,29 @@ export const useAppearanceStore = defineStore("appearance", () => {
     });
     if (!selected || Array.isArray(selected)) return;
     skinPresetId.value = null;
-    afterBackgroundPicked(selected, true);
+    revokeDraftBlobUrl();
+    const stored = await ingestBackgroundToWorkspace(selected);
+    afterBackgroundPicked(stored, true);
+    await refreshDraftPreviewUrl();
   }
 
   function clearBackgroundImage() {
     skinPresetId.value = null;
     patchSkinDraft({ backgroundImage: null });
+    revokeDraftBlobUrl();
+    void refreshDraftPreviewUrl();
     logAppearance("clear-background-image");
   }
 
-  function saveAndApplySkin() {
-    customSkin.value = cloneSkin(skinDraft.value);
+  async function saveAndApplySkin() {
+    let draft = cloneSkin(skinDraft.value);
+    const bg = draft.backgroundImage;
+    if (bg?.startsWith("blob:")) {
+      logAppearance("save-skin-skip-blob-background");
+      draft = { ...draft, backgroundImage: null };
+    }
+    revokeDraftBlobUrl();
+    customSkin.value = draft;
     const stillPreset = SKIN_PRESET_LIST.some(
       (p) =>
         customSkin.value.backgroundImage?.replace(/\\/g, "/").includes(p.workspaceSubpath),
@@ -1278,6 +1348,7 @@ export const useAppearanceStore = defineStore("appearance", () => {
     colorScheme.value = "custom";
     applyTheme();
     persist();
+    await refreshAppliedPreviewUrl();
     closeSkinDialog();
     requestSkinBgmSync();
     logAppearance("save-and-apply-skin", {
@@ -1320,9 +1391,13 @@ export const useAppearanceStore = defineStore("appearance", () => {
     skinPresetBgm,
     skinBgmPlaying,
     setSkinBgmPlaying,
+    toolAudioSuppressed,
+    setToolAudioSuppressed,
     skinBgmSyncNonce,
     requestSkinBgmSync,
     skinDraft,
+    skinDraftPreviewUrl,
+    skinAppliedPreviewUrl,
     skinDialogOpen,
     uiPreferences,
     creativeBackground,

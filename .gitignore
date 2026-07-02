@@ -1,6 +1,3 @@
-# 独立工程，不纳入本仓库
-quick-translate/
-
 # 依赖与构建产物
 node_modules/
 dist/
@@ -17,6 +14,7 @@ __pycache__/
 
 # 本地下载/缓存
 downloads/
+.pw-quark-profile/
 
 # 日志
 logs/

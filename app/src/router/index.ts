@@ -28,6 +28,42 @@ const router = createRouter({
       meta: { title: "长截图分割" },
     },
     {
+      path: "/tools/translate",
+      name: "translate",
+      component: () => import("../views/TranslateView.vue"),
+      meta: { title: "翻译" },
+    },
+    {
+      path: "/tools/text-compare",
+      name: "text-compare",
+      component: () => import("../views/TextCompareView.vue"),
+      meta: { title: "文本比对" },
+    },
+    {
+      path: "/tools/regex-builder",
+      name: "regex-builder",
+      component: () => import("../views/RegexBuilderView.vue"),
+      meta: { title: "正则表达式生成" },
+    },
+    {
+      path: "/tools/gomoku",
+      name: "gomoku",
+      component: () => import("../views/GomokuView.vue"),
+      meta: { title: "五子棋" },
+    },
+    {
+      path: "/tools/ear-naming",
+      name: "ear-naming",
+      component: () => import("../views/EarNamingView.vue"),
+      meta: { title: "听力命名训练", suppressSkinBgm: true },
+    },
+    {
+      path: "/tools/speed-player",
+      name: "speed-player",
+      component: () => import("../views/SpeedPlayerView.vue"),
+      meta: { title: "倍速播放器", suppressSkinBgm: true },
+    },
+    {
       path: "/tools/:id",
       name: "tool-detail",
       component: () => import("../views/ToolDetailView.vue"),

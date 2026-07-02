@@ -449,7 +449,7 @@ onMounted(() => {
                   !appearance.customSkin.keepVideoAudio ||
                   !appearance.isCustomSkinVideoBackground(
                     appearance.customSkin.backgroundImage,
-                    appearance.getSkinImageUrl(appearance.customSkin.backgroundImage),
+                    appearance.skinAppliedPreviewUrl,
                   )
                 "
               >
@@ -460,7 +460,7 @@ onMounted(() => {
                 v-else-if="
                   appearance.isCustomSkinVideoBackground(
                     appearance.customSkin.backgroundImage,
-                    appearance.getSkinImageUrl(appearance.customSkin.backgroundImage),
+                    appearance.skinAppliedPreviewUrl,
                   )
                 "
                 class="text-xs text-zinc-500"
@@ -945,8 +945,8 @@ onMounted(() => {
             <div class="border-t border-border pt-4 space-y-3">
               <div class="flex items-center justify-between gap-4">
                 <div>
-                  <p class="text-sm text-zinc-300">显示媒体调试终端</p>
-                  <p class="text-xs text-zinc-500">右下角实时显示主题媒体加载日志</p>
+                  <p class="text-sm text-zinc-300">显示调试终端</p>
+                  <p class="text-xs text-zinc-500">右下角实时日志：主题媒体、歌单 OCR 识别步骤与 Python 输出</p>
                 </div>
                 <button
                   type="button"

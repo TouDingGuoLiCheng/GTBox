@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "non_empty_3",
+      "type": "non_empty",
+      "position": {
+        "x": 0,
+        "y": 60
+      },
+      "params": {}
+    },
+    {
+      "id": "contains_4",
+      "type": "contains",
+      "position": {
+        "x": 0,
+        "y": 140
+      },
+      "params": {
+        "text": " - ",
+        "ignoreCase": false
+      }
+    },
+    {
+      "id": "split_parts_5",
+      "type": "split_parts",
+      "position": {
+        "x": 0,
+        "y": 220
+      },
+      "params": {
+        "separator": " - ",
+        "parts": 2
+      }
+    },
+    {
+      "id": "and_2",
+      "type": "and",
+      "position": {
+        "x": 180,
+        "y": 140
+      },
+      "params": {}
+    },
+    {
+      "id": "scope_1",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 140
+      },
+      "params": {
+        "mode": "non_empty_line"
+      }
+    },
+    {
+      "id": "root_6",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 140
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_7",
+      "source": "non_empty_3",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_8",
+      "source": "contains_4",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_9",
+      "source": "split_parts_5",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_10",
+      "source": "and_2",
+      "sourceHandle": "out",
+      "target": "scope_1",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_11",
+      "source": "scope_1",
+      "sourceHandle": "bool",
+      "target": "root_6",
+      "targetHandle": "in"
+    }
+  ]
+}

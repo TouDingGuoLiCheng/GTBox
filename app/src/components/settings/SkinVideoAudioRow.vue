@@ -16,9 +16,14 @@ const skin = computed(() =>
   props.useDraft ? appearance.skinDraft : appearance.customSkin,
 );
 
-const isVideo = computed(() =>
-  isVideoSkinPath(skin.value.backgroundImage) ||
-  isVideoSkinPath(appearance.getSkinImageUrl(skin.value.backgroundImage)),
+const resolvedUrl = computed(() =>
+  props.useDraft ? appearance.skinDraftPreviewUrl : appearance.skinAppliedPreviewUrl,
+);
+
+const isVideo = computed(
+  () =>
+    isVideoSkinPath(skin.value.backgroundImage) ||
+    isVideoSkinPath(resolvedUrl.value),
 );
 
 function onToggleKeep() {

@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "non_empty_3",
+      "type": "non_empty",
+      "position": {
+        "x": 0,
+        "y": 100
+      },
+      "params": {}
+    },
+    {
+      "id": "starts_with_4",
+      "type": "starts_with",
+      "position": {
+        "x": 0,
+        "y": 180
+      },
+      "params": {
+        "preset": "digit",
+        "text": "",
+        "ignoreCase": false
+      }
+    },
+    {
+      "id": "and_2",
+      "type": "and",
+      "position": {
+        "x": 180,
+        "y": 140
+      },
+      "params": {}
+    },
+    {
+      "id": "scope_1",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 140
+      },
+      "params": {
+        "mode": "non_empty_line"
+      }
+    },
+    {
+      "id": "root_5",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 140
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_6",
+      "source": "non_empty_3",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_7",
+      "source": "starts_with_4",
+      "sourceHandle": "out",
+      "target": "and_2",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_8",
+      "source": "and_2",
+      "sourceHandle": "out",
+      "target": "scope_1",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_9",
+      "source": "scope_1",
+      "sourceHandle": "bool",
+      "target": "root_5",
+      "targetHandle": "in"
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 import { Icon } from "@iconify/vue";
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import GomokuStoneIcon from "../gomoku/GomokuStoneIcon.vue";
 import type { ToolItem } from "../../types/tool";
 import { useAppearanceStore } from "../../stores/appearance";
 import { useToolsStore } from "../../stores/tools";
@@ -16,6 +17,9 @@ const store = useToolsStore();
 const appearance = useAppearanceStore();
 
 const isSelected = computed(() => store.selectedToolId === props.tool.id);
+
+const iconBoxClass =
+  "mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20 transition duration-300 group-hover:bg-accent/15 group-hover:ring-accent/35";
 
 const cardHoverClass = computed(() =>
   appearance.uiPreferences.cardAnimation
@@ -63,9 +67,10 @@ function openTool() {
       :initial="{ scale: 1 }"
       :hovered="{ scale: 1.05 }"
       :transition="{ type: 'spring', stiffness: 400, damping: 18 }"
-      class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20"
+      :class="iconBoxClass"
     >
-      <Icon :icon="tool.icon ?? 'mdi:tools'" class="text-2xl" />
+      <GomokuStoneIcon v-if="tool.id === 'gomoku'" variant="card" :size="26" />
+      <Icon v-else :icon="tool.icon ?? 'mdi:tools'" class="text-2xl" />
     </div>
 
     <h3 class="mb-1.5 text-base font-semibold text-zinc-100">{{ tool.name }}</h3>
@@ -101,10 +106,9 @@ function openTool() {
       class="absolute left-0 top-4 h-10 w-1 rounded-r-full bg-accent transition-all duration-300"
     />
 
-    <div
-      class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20"
-    >
-      <Icon :icon="tool.icon ?? 'mdi:tools'" class="text-2xl" />
+    <div :class="iconBoxClass">
+      <GomokuStoneIcon v-if="tool.id === 'gomoku'" variant="card" :size="26" />
+      <Icon v-else :icon="tool.icon ?? 'mdi:tools'" class="text-2xl" />
     </div>
 
     <h3 class="mb-1.5 text-base font-semibold text-zinc-100">{{ tool.name }}</h3>

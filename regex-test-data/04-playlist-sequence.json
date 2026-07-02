@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "non_empty_1",
+      "type": "non_empty",
+      "position": {
+        "x": -80,
+        "y": 20
+      },
+      "params": {
+        "builderMode": "segment"
+      }
+    },
+    {
+      "id": "count_2",
+      "type": "count",
+      "position": {
+        "x": 40,
+        "y": 20
+      },
+      "params": {
+        "builderMode": "segment",
+        "mode": "at_least",
+        "n": 1
+      }
+    },
+    {
+      "id": "space_3",
+      "type": "space",
+      "position": {
+        "x": 160,
+        "y": 20
+      },
+      "params": {
+        "mode": "exactly",
+        "n": 1
+      }
+    },
+    {
+      "id": "matches_text_4",
+      "type": "matches_text",
+      "position": {
+        "x": 280,
+        "y": 20
+      },
+      "params": {
+        "builderMode": "segment",
+        "text": "-",
+        "ignoreCase": false
+      }
+    },
+    {
+      "id": "space_5",
+      "type": "space",
+      "position": {
+        "x": 400,
+        "y": 20
+      },
+      "params": {
+        "mode": "exactly",
+        "n": 1
+      }
+    },
+    {
+      "id": "non_empty_6",
+      "type": "non_empty",
+      "position": {
+        "x": 520,
+        "y": 20
+      },
+      "params": {
+        "builderMode": "segment"
+      }
+    },
+    {
+      "id": "count_7",
+      "type": "count",
+      "position": {
+        "x": 640,
+        "y": 20
+      },
+      "params": {
+        "builderMode": "segment",
+        "mode": "at_least",
+        "n": 1
+      }
+    },
+    {
+      "id": "contains_9",
+      "type": "contains",
+      "position": {
+        "x": 640,
+        "y": 160
+      },
+      "params": {
+        "text": "周杰伦",
+        "ignoreCase": false
+      }
+    },
+    {
+      "id": "not_contains_10",
+      "type": "not_contains",
+      "position": {
+        "x": 640,
+        "y": 240
+      },
+      "params": {
+        "text": "Live",
+        "ignoreCase": true
+      }
+    },
+    {
+      "id": "and_8",
+      "type": "and",
+      "position": {
+        "x": 860,
+        "y": 120
+      },
+      "params": {}
+    },
+    {
+      "id": "scope_11",
+      "type": "scope",
+      "position": {
+        "x": 1040,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_12",
+      "type": "root",
+      "position": {
+        "x": 1220,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_13",
+      "source": "non_empty_1",
+      "sourceHandle": "next",
+      "target": "count_2",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_14",
+      "source": "count_2",
+      "sourceHandle": "next",
+      "target": "space_3",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_15",
+      "source": "space_3",
+      "sourceHandle": "next",
+      "target": "matches_text_4",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_16",
+      "source": "matches_text_4",
+      "sourceHandle": "next",
+      "target": "space_5",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_17",
+      "source": "space_5",
+      "sourceHandle": "next",
+      "target": "non_empty_6",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_18",
+      "source": "non_empty_6",
+      "sourceHandle": "next",
+      "target": "count_7",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_19",
+      "source": "count_7",
+      "sourceHandle": "out",
+      "target": "and_8",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_20",
+      "source": "contains_9",
+      "sourceHandle": "out",
+      "target": "and_8",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_21",
+      "source": "not_contains_10",
+      "sourceHandle": "out",
+      "target": "and_8",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_22",
+      "source": "and_8",
+      "sourceHandle": "out",
+      "target": "scope_11",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_23",
+      "source": "scope_11",
+      "sourceHandle": "bool",
+      "target": "root_12",
+      "targetHandle": "in"
+    }
+  ]
+}

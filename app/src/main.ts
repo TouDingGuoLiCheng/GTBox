@@ -20,6 +20,11 @@ app.use(pinia);
 app.use(router);
 app.use(MotionPlugin);
 
-useAppearanceStore(pinia).init();
+const appearance = useAppearanceStore(pinia);
+appearance.init();
+
+router.beforeEach((to) => {
+  appearance.setToolAudioSuppressed(to.meta.suppressSkinBgm === true);
+});
 
 app.mount("#app");

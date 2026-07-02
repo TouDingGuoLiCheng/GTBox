@@ -13,7 +13,7 @@
   letter-spacing: 0.02em;
 }
 
-.header-skin-bgm__disc {
+.header-skin-bgm__disc--spinning {
   animation: header-skin-bgm-disc-spin 2.8s linear infinite;
 }
 
@@ -67,6 +67,107 @@ html[data-skin-preset="preset-clouds"] {
   --color-surface-elevated: #152030;
 }
 
+html[data-skin-preset="preset-train"] {
+  --color-accent: #e8a060;
+  --color-surface: #120c08;
+  --color-surface-elevated: #221810;
+}
+
+html[data-skin-preset="preset-wheat"] {
+  --color-accent: #6ec8a0;
+  --color-surface: #080c0a;
+  --color-surface-elevated: #142018;
+}
+
+html[data-skin-preset="preset-peaceful"] {
+  --color-accent: #9ab0c8;
+  --color-surface: #0c0e12;
+  --color-surface-elevated: #181c22;
+}
+
+html[data-skin-preset="preset-flower"] {
+  --color-accent: #c06080;
+  --color-surface: #f8f6f4;
+  --color-surface-elevated: #ffffff;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] {
+  --color-border: rgb(0 0 0 / 0.1);
+  color: #18181b;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-100,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-200 {
+  color: #18181b !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-300,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-400,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-500,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .text-zinc-600 {
+  color: #52525b !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .hover\:bg-white\/5:hover,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .hover\:bg-white\/10:hover {
+  background-color: rgb(0 0 0 / 0.06) !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-white\/8,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-white\/10 {
+  background-color: rgb(0 0 0 / 0.06) !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-black\/15,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-black\/20,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-black\/25,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-black\/30 {
+  background-color: rgb(255 255 255 / 0.55) !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-surface-elevated\/40,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-surface-elevated\/50,
+html[data-skin-preset="preset-flower"][data-theme="custom"] .bg-surface-elevated\/60 {
+  background-color: rgb(255 255 255 / 0.5) !important;
+}
+
+html[data-skin-preset="preset-flower"][data-theme="custom"] .app-brand-title {
+  color: #9d174d;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+html[data-skin-preset="preset-eye"] {
+  --color-accent: #d8b050;
+  --color-surface: #100e08;
+  --color-surface-elevated: #201c14;
+}
+
+html[data-skin-preset] .ui-card {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 html[data-skin-preset="preset-clouds"] .ui-card {
   border-color: rgb(110 200 232 / 0.14);
+}
+
+html[data-skin-preset="preset-train"] .ui-card {
+  border-color: rgb(232 160 96 / 0.14);
+}
+
+html[data-skin-preset="preset-wheat"] .ui-card {
+  border-color: rgb(110 200 160 / 0.14);
+}
+
+html[data-skin-preset="preset-peaceful"] .ui-card {
+  border-color: rgb(154 176 200 / 0.12);
+}
+
+html[data-skin-preset="preset-flower"] .ui-card {
+  border-color: rgb(192 96 128 / 0.2);
+}
+
+html[data-skin-preset="preset-eye"] .ui-card {
+  border-color: rgb(216 176 80 / 0.14);
 }

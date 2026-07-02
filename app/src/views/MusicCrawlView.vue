@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { invoke } from "@tauri-apps/api/core";
-import { useMusicCrawlRunStore } from "../stores/musicCrawlRun";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  useMusicCrawlRunStore,
+  songQueryKey,
+  type CrawlSongResult,
+} from "../stores/musicCrawlRun";
+import { pushDebugLine } from "../utils/mediaDebug";
 import { storeToRefs } from "pinia";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -23,15 +29,86 @@ type EditableBox = {
 };
 type MediaEntry = { name: string; path: string };
 
+/** 阶段B：每首歌的下载状态。pending=未下载，success=成功，failed=失败。 */
+type SongStatus = "pending" | "success" | "failed";
+type SongItem = {
+  /** 列表内稳定 id，仅本会话使用 */
+  id: string;
+  song: string;
+  artist: string;
+  status: SongStatus;
+  /** 最近一次的提示文本（成功时是文件路径，失败时是原因） */
+  note?: string;
+};
+
+// 注：workspace_root 默认就指向 workspaces/music_crawl，因此这里写相对路径无需再带 `music_crawl/` 前缀，
+//     否则会变成 workspaces/music_crawl/music_crawl/songs_state.json 双层目录。
+const SONGS_STATE_PATH = "songs_state.json";
+let songItemSeq = 0;
+function makeSongId() {
+  songItemSeq += 1;
+  return `song-${Date.now().toString(36)}-${songItemSeq}`;
+}
+function songQuery(item: { song: string; artist: string }) {
+  const song = item.song.trim();
+  const artist = item.artist.trim();
+  return artist ? `${song}-${artist}` : song;
+}
+function songKeyFromItem(item: { song: string; artist: string }) {
+  return songQueryKey(songQuery(item));
+}
+
 const router = useRouter();
 const runStore = useMusicCrawlRunStore();
-const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, lastRegionsReady } =
+const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, lastRegionsReady, crawlStatuses, crawlCurrentQuery, siteRateLimitHitAt, siteRateLimitMessage } =
   storeToRefs(runStore);
 
 const REGIONS_CACHE_DIR = "playlist_ocr/regions_cache";
+const DEFAULT_OCR_FOLDER = "playlist_ocr/images_in";
+/** folder：扫描 ocrInputFolder；files：仅扫描 images 中已选路径 */
+const ocrInputSource = ref<"folder" | "files">("folder");
+const ocrInputFolder = ref(DEFAULT_OCR_FOLDER);
 const stage = ref<"ocr" | "crawl">("ocr");
+/** 阶段B 正式数据源：每首歌一条记录，含 status。 */
+const songItems = ref<SongItem[]>([]);
+/** 批量编辑对话框内部 buffer（textarea 文本），保存时再合并到 songItems。 */
 const songsText = ref("");
-const songs = computed(() => songsText.value.split(/\r?\n/).map((v) => v.trim()).filter(Boolean));
+const songs = computed(() => songItems.value.map((s) => songQuery(s)));
+const successCount = computed(() => songItems.value.filter((s) => s.status === "success").length);
+const failedCount = computed(() => songItems.value.filter((s) => s.status === "failed").length);
+const pendingCount = computed(() => songItems.value.filter((s) => s.status === "pending").length);
+/** 启动爬取时实际会处理的歌曲数（未爬取 + 失败）。 */
+const runnableCount = computed(() => failedCount.value + pendingCount.value);
+/** 「确认歌单并开始爬取」按钮文案：有失败项时改为「重新爬取」。
+ * 实时响应 songItems 的变化（增/删/重试结束后状态变化都会重算）。 */
+const crawlButtonLabel = computed(() => {
+  if (running.value) return "运行中...";
+  if (failedCount.value > 0) {
+    if (pendingCount.value > 0) return `重新爬取（${failedCount.value} 失败 + ${pendingCount.value} 未爬取）`;
+    return `重新爬取（${failedCount.value} 失败）`;
+  }
+  if (pendingCount.value > 0) return `确认歌单并开始爬取（${pendingCount.value}）`;
+  return "确认歌单并开始爬取";
+});
+/** 阶段B 多选交互：选中集合 + 上次锚点（用于 Shift 区间选） */
+const selectedSongIds = ref<Set<string>>(new Set());
+const lastClickedSongId = ref("");
+const songListEl = ref<HTMLElement | null>(null);
+/** 单首正在重试的歌曲 id（按钮 loading 用）。批量爬取期间禁用所有重试。 */
+const retryingSongId = ref("");
+/** 批量编辑对话框开关 */
+const showBulkEditor = ref(false);
+/** Cookie 更新对话框（站点限制 / 手动入口） */
+const showCookieDialog = ref(false);
+/** 对话框是站点限制自动打开 (`auto`) 还是用户手动打开 (`manual`)，文案略有不同。 */
+const cookieDialogTrigger = ref<"auto" | "manual">("manual");
+/** 对话框 textarea 绑定的 Cookie 字符串。 */
+const cookieDialogText = ref("");
+/** 对话框内的临时提示（保存成功/失败等） */
+const cookieDialogHint = ref("");
+const cookieDialogSaving = ref(false);
+/** 持久化防抖句柄 */
+let persistSongsTimer: ReturnType<typeof setTimeout> | null = null;
 const images = ref<MediaEntry[]>([]);
 const selectedImage = ref("");
 const infoMessage = ref("");
@@ -78,6 +155,8 @@ let dragRafId = 0;
 let pendingDragEvent: MouseEvent | null = null;
 
 const imgRender = reactive({ displayW: 1, displayH: 1, naturalW: 1, naturalH: 1 });
+/** OCR 框使用的原图像素宽高（按图缓存）；缩略图被下采样时不会再让框错位 */
+const ocrSourceDimsByImage = ref<Record<string, { w: number; h: number }>>({});
 const dragState = reactive({
   boxId: "",
   mode: "move" as "move" | "resize",
@@ -90,7 +169,6 @@ const dragState = reactive({
 });
 
 const ocrForm = reactive({
-  input: "playlist_ocr/images_in",
   output: "songs.txt",
   merge: "overwrite",
   device: "auto",
@@ -99,10 +177,9 @@ const crawlForm = reactive({
   input: "songs.txt",
   output: "quark_results.csv",
   downloadDir: "downloads",
-  mode: "B",
+  mode: "A",
   bMethod: "http",
   linksOnly: false,
-  manualLoginOnce: false,
   delay: 0.8,
   timeout: 40,
 });
@@ -137,8 +214,29 @@ function basename(path: string) {
   const parts = path.replace(/\\/g, "/").split("/");
   return parts[parts.length - 1] ?? path;
 }
+/**
+ * 把 OCR 识别出的歌名/歌手清理成可用于搜索的字符串：
+ *  1) 删除所有完整括号对（中英文圆/方括号）及内部内容
+ *  2) 残留的左括号未闭合 → 视为被截断的注释，删除「(」到行尾（或下一个 `-` 之前）
+ *  3) 删除播放量后缀：`125w+` / `1K+` / `200万+` / `1260w` 等
+ *  4) 合并空白并 trim
+ *
+ *  注：孤立的「右括号」不处理（保留原样），避免误伤艺人名/歌名里作为正文的 `)`。
+ */
 function normalizeName(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+  let s = value;
+  // 1) 完整括号对（迭代处理嵌套，最多 5 层）
+  for (let i = 0; i < 5; i++) {
+    const next = s.replace(/[(（[【][^()（）[\]【】]*[)）\]】]/g, " ");
+    if (next === s) break;
+    s = next;
+  }
+  // 2) 残留左括号（未闭合）：从「(」起到行尾或下一个分隔符 `-` 之前
+  s = s.replace(/[(（[【][^-—–]*?(?=[-—–]|$)/g, " ");
+  // 3) 播放量后缀：125w+ / 1K+ / 200万+ / 1.5亿 / 1260w
+  s = s.replace(/\s*\d+(?:\.\d+)?\s*[wWkK万亿]\+?\s*/g, " ");
+  // 4) 合并空白并 trim
+  return s.replace(/\s+/g, " ").trim();
 }
 function parseSongArtist(line: string): { song: string; artist: string } | null {
   const clean = normalizeName(line).replace(/[—–－]/g, "-");
@@ -170,8 +268,9 @@ function structuredSongsFromLines(rawLines: string[]) {
 }
 
 function clampBox(box: EditableBox): EditableBox {
-  const maxW = imgRender.naturalW;
-  const maxH = imgRender.naturalH;
+  const base = ocrCoordBase();
+  const maxW = base.w;
+  const maxH = base.h;
   const x = Math.max(0, Math.min(maxW - 1, box.x));
   const y = Math.max(0, Math.min(maxH - 1, box.y));
   const w = Math.max(10, Math.min(maxW - x, box.w));
@@ -192,7 +291,11 @@ function scrollBoxIntoPreviewViewport(box: EditableBox) {
   const vp = previewViewportEl.value;
   if (!vp || !previewImageEl.value) return;
   updateImageRenderMetrics();
-  const sy = imgRender.displayH / imgRender.naturalH;
+  const dims = selectedImage.value
+    ? ocrSourceDimsByImage.value[imageCacheKey(selectedImage.value)]
+    : undefined;
+  const baseH = dims?.h && dims.h > 0 ? dims.h : imgRender.naturalH;
+  const sy = imgRender.displayH / baseH;
   const pad = 8;
   const top = pad + box.y * sy;
   const bottom = top + box.h * sy;
@@ -225,7 +328,7 @@ function gotoNextUnpairedOnCurrentImage() {
  */
 async function gotoNextImageWithUnpaired() {
   if (!images.value.length) {
-    showInfoMessage("请先刷新或指定截图文件夹");
+    showInfoMessage("请先选择文件夹或图片");
     return;
   }
   if (previewBusy.value) return;
@@ -255,9 +358,24 @@ async function gotoNextImageWithUnpaired() {
   }
   showInfoMessage("列表中其他截图均无未配对行（或尚无 regions 缓存，需先批量扫描/识别）");
 }
+/**
+ * 框坐标的「原图像素」分母：优先用 OCR 返回的原图尺寸，否则回退到 <img>.natural*。
+ * boxStyle / addBox / clampBox / 拖拽换算必须都用同一个分母，否则
+ * 显示框对了、但发给后端的 x/y/w/h 仍是缩略图坐标，会导致「识别新框」裁错位置。
+ */
+function ocrCoordBase() {
+  const dims = selectedImage.value
+    ? ocrSourceDimsByImage.value[imageCacheKey(selectedImage.value)]
+    : undefined;
+  return {
+    w: dims?.w && dims.w > 0 ? dims.w : imgRender.naturalW,
+    h: dims?.h && dims.h > 0 ? dims.h : imgRender.naturalH,
+  };
+}
 function boxStyle(box: EditableBox) {
-  const sx = imgRender.displayW / imgRender.naturalW;
-  const sy = imgRender.displayH / imgRender.naturalH;
+  const base = ocrCoordBase();
+  const sx = imgRender.displayW / base.w;
+  const sy = imgRender.displayH / base.h;
   return { left: `${box.x * sx}px`, top: `${box.y * sy}px`, width: `${box.w * sx}px`, height: `${box.h * sy}px` };
 }
 function boxClass(box: EditableBox) {
@@ -329,12 +447,13 @@ function onBoxMouseDown(event: MouseEvent, box: EditableBox, mode: "move" | "res
   dragState.originH = box.h;
 }
 function addBox() {
+  const base = ocrCoordBase();
   const newBox: EditableBox = {
     id: `box-${Date.now()}`,
-    x: Math.max(0, imgRender.naturalW * 0.35),
-    y: Math.max(0, imgRender.naturalH * 0.35),
-    w: Math.max(80, imgRender.naturalW * 0.25),
-    h: Math.max(28, imgRender.naturalH * 0.05),
+    x: Math.max(0, base.w * 0.35),
+    y: Math.max(0, base.h * 0.35),
+    w: Math.max(80, base.w * 0.25),
+    h: Math.max(28, base.h * 0.05),
     text: "",
     score: 0,
     role: "title",
@@ -387,8 +506,9 @@ function applyDragUpdate() {
   const idx = editableBoxes.value.findIndex((box) => box.id === dragState.boxId);
   if (idx < 0) return;
 
-  const sx = imgRender.naturalW / imgRender.displayW;
-  const sy = imgRender.naturalH / imgRender.displayH;
+  const base = ocrCoordBase();
+  const sx = base.w / imgRender.displayW;
+  const sy = base.h / imgRender.displayH;
   const dx = (event.clientX - dragState.startX) * sx;
   const dy = (event.clientY - dragState.startY) * sy;
   const box = editableBoxes.value[idx];
@@ -421,8 +541,14 @@ function onGlobalMouseUp() {
 }
 
 async function refreshImages() {
+  if (ocrInputSource.value === "files") {
+    if (!images.value.length) {
+      showInfoMessage("当前为自选图片模式，请用「选择图片」或拖入截图");
+    }
+    return;
+  }
   try {
-    images.value = await invoke<MediaEntry[]>("list_media_files", { relativeDir: ocrForm.input });
+    images.value = await invoke<MediaEntry[]>("list_media_files", { relativeDir: ocrInputFolder.value });
     selectedImage.value = images.value[0]?.path ?? "";
     await loadPreviewImage();
   } catch (err) {
@@ -455,8 +581,53 @@ async function pickFolder() {
   try {
     const folder = await invoke<string | null>("pick_folder");
     if (!folder) return;
-    ocrForm.input = folder;
+    ocrInputSource.value = "folder";
+    ocrInputFolder.value = folder;
+    pushDebugLine("歌单OCR", "pick-folder", `选择文件夹：${folder}`);
     await refreshImages();
+  } finally {
+    pickingDialog.value = false;
+  }
+}
+async function pickDownloadDir() {
+  if (pickingDialog.value) return;
+  pickingDialog.value = true;
+  try {
+    const folder = await invoke<string | null>("pick_folder");
+    if (!folder) return;
+    crawlForm.downloadDir = folder;
+    showInfoMessage(`下载目录已设置为：${folder}`, 4000);
+    pushDebugLine("音乐爬取", "pick-download-dir", `选择下载目录：${folder}`);
+  } finally {
+    pickingDialog.value = false;
+  }
+}
+async function pickInputSongFile() {
+  if (pickingDialog.value) return;
+  pickingDialog.value = true;
+  try {
+    const file = await invoke<string | null>("pick_song_list_file");
+    if (!file) return;
+    crawlForm.input = file;
+    showInfoMessage(`输入歌单文件：${file}`, 4000);
+    pushDebugLine("音乐爬取", "pick-input-songs", `选择输入歌单：${file}`);
+  } finally {
+    pickingDialog.value = false;
+  }
+}
+async function pickOutputCsvFile() {
+  if (pickingDialog.value) return;
+  pickingDialog.value = true;
+  try {
+    const file = await invoke<string | null>("pick_save_file", {
+      defaultName: "quark_results.csv",
+      filterLabel: "CSV",
+      filterExts: ["csv"],
+    });
+    if (!file) return;
+    crawlForm.output = file;
+    showInfoMessage(`结果 CSV：${file}`, 4000);
+    pushDebugLine("音乐爬取", "pick-output-csv", `选择结果 CSV：${file}`);
   } finally {
     pickingDialog.value = false;
   }
@@ -467,8 +638,13 @@ async function pickSingleImage() {
   try {
     const files = await invoke<string[]>("pick_image_files");
     if (!files.length) return;
+    ocrInputSource.value = "files";
     images.value = files.map((path) => ({ name: basename(path), path }));
     selectedImage.value = files[0];
+    pushDebugLine("歌单OCR", "pick-images", `选择 ${files.length} 张图片`, {
+      names: files.map((p) => basename(p)),
+    });
+    await loadPreviewImage();
   } finally {
     pickingDialog.value = false;
   }
@@ -492,8 +668,11 @@ function onDropImage(event: DragEvent) {
     showInfoMessage("只支持图片文件拖入（png/jpg/jpeg/webp）");
     return;
   }
+  ocrInputSource.value = "files";
   images.value = [{ name: basename(path), path }];
   selectedImage.value = path;
+  pushDebugLine("歌单OCR", "drop-image", `拖入图片：${basename(path)}`, { path });
+  void loadPreviewImage();
 }
 
 type DetectRegion = {
@@ -506,6 +685,9 @@ type DetectRegion = {
   role?: BoxRole;
   pairIndex?: number;
   note?: string;
+  /** 原图像素宽高（来自 Python OCR），前端用它换算缩略图上的显示坐标 */
+  imageWidth?: number;
+  imageHeight?: number;
 };
 
 function mapDetectResultToBoxes(result: DetectRegion[], idPrefix: string): EditableBox[] {
@@ -524,12 +706,47 @@ function mapDetectResultToBoxes(result: DetectRegion[], idPrefix: string): Edita
   }));
 }
 
+/** 从 OCR 返回的任一 region 提取原图宽高并按图缓存，供 boxStyle 使用 */
+function captureOcrSourceDims(imagePath: string, regions: DetectRegion[]) {
+  if (!imagePath || !regions.length) return;
+  const first = regions.find((r) => r.imageWidth && r.imageHeight);
+  if (!first || !first.imageWidth || !first.imageHeight) return;
+  const key = imageCacheKey(imagePath);
+  ocrSourceDimsByImage.value = {
+    ...ocrSourceDimsByImage.value,
+    [key]: { w: first.imageWidth, h: first.imageHeight },
+  };
+}
+
 async function fetchDetectBoxesForImage(imagePath: string): Promise<EditableBox[]> {
-  const result = await invoke<DetectRegion[]>("detect_image_regions", {
-    imagePath,
+  const t0 = performance.now();
+  pushDebugLine("歌单OCR", "detect-start", `识别当前图：${basename(imagePath)}`, {
+    path: imagePath,
     device: ocrForm.device,
   });
-  return mapDetectResultToBoxes(result, `d-${imageCacheKey(imagePath).slice(-12)}-${Date.now()}`);
+  try {
+    const result = await invoke<DetectRegion[]>("detect_image_regions", {
+      imagePath,
+      device: ocrForm.device,
+    });
+    captureOcrSourceDims(imagePath, result);
+    const ms = Math.round(performance.now() - t0);
+    pushDebugLine("歌单OCR", "detect-done", `检测完成 ${result.length} 个框，耗时 ${ms}ms`, {
+      roles: result.reduce(
+        (acc, b) => {
+          const r = b.role ?? "unknown";
+          acc[r] = (acc[r] ?? 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    });
+    return mapDetectResultToBoxes(result, `d-${imageCacheKey(imagePath).slice(-12)}-${Date.now()}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    pushDebugLine("歌单OCR", "detect-error", msg, { path: imagePath });
+    throw err;
+  }
 }
 
 function regionsCachePath(imageFileName: string) {
@@ -550,6 +767,7 @@ async function importRegionsFromCache(imagePath: string, imageFileName?: string)
       relativePath: regionsCachePath(fileName),
     });
     const regions = JSON.parse(text) as DetectRegion[];
+    captureOcrSourceDims(imagePath, regions);
     const boxes = mapDetectResultToBoxes(regions, `b-${key.slice(-10)}`);
     boxesByImage.value[key] = boxes;
     if (selectedImage.value === imagePath) {
@@ -595,6 +813,10 @@ async function recognizeCurrentBoxes() {
 
   recognizing.value = true;
   showInfoMessage(`正在识别 ${pending.length} 个新框…`, 12000);
+  pushDebugLine("歌单OCR", "recognize-boxes-start", `按框重识别 ${pending.length} 个新框`, {
+    image: basename(selectedImage.value),
+    device: ocrForm.device,
+  });
   try {
     const result = await invoke<Array<{ index: number; text: string; score: number }>>("recognize_regions", {
       imagePath: selectedImage.value,
@@ -622,15 +844,82 @@ async function recognizeCurrentBoxes() {
     }
     editableBoxes.value = next;
     persistBoxesForImage(selectedImage.value);
+    pushDebugLine("歌单OCR", "recognize-boxes-done", `新框识别完成：${result.length} 个`, {
+      texts: result.map((r) => r.text),
+    });
     showInfoMessage(`新框识别完成（${result.length} 个）`);
   } catch (err) {
-    showInfoMessage(`重识别失败：${err instanceof Error ? err.message : String(err)}`, 8000);
+    const msg = err instanceof Error ? err.message : String(err);
+    pushDebugLine("歌单OCR", "recognize-boxes-error", msg);
+    showInfoMessage(`重识别失败：${msg}`, 8000);
   } finally {
     recognizing.value = false;
     await nextTick();
     updateImageRenderMetrics();
   }
 }
+/** 把规范化后的 `song-artist` 行数组转成 SongItem，去重时按 songKeyFromItem。
+ * `oldMap` 提供「编辑前」每个 key 的状态，用于编辑后继承（批量编辑/导入文件场景）。 */
+function songItemsFromLines(
+  lines: string[],
+  oldMap?: Map<string, { status: SongStatus; note?: string }>,
+): SongItem[] {
+  const seen = new Set<string>();
+  const out: SongItem[] = [];
+  for (const raw of structuredSongsFromLines(lines)) {
+    const parsed = parseSongArtist(raw);
+    if (!parsed) continue;
+    const key = songKeyFromItem(parsed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const prev = oldMap?.get(key);
+    out.push({
+      id: makeSongId(),
+      song: parsed.song,
+      artist: parsed.artist,
+      status: prev?.status ?? "pending",
+      note: prev?.note,
+    });
+  }
+  return out;
+}
+function songItemsToLines(items: SongItem[]): string[] {
+  return items.map((s) => songQuery(s)).filter(Boolean);
+}
+function songItemsToText(items: SongItem[]): string {
+  const lines = songItemsToLines(items);
+  return lines.length ? `${lines.join("\n")}\n` : "";
+}
+function existingStatusMap(items: SongItem[]) {
+  const m = new Map<string, { status: SongStatus; note?: string }>();
+  for (const s of items) m.set(songKeyFromItem(s), { status: s.status, note: s.note });
+  return m;
+}
+/** 把外部输入的歌单行合并进 songItems：新行 status=pending，老行（按 key 命中）保留原 status。
+ * 顺序：以传入的 lines 为准（用户最新意图），未在新列表中的老歌会被丢弃。 */
+function mergeSongsFromLines(lines: string[]) {
+  const oldMap = existingStatusMap(songItems.value);
+  songItems.value = songItemsFromLines(lines, oldMap);
+  clearSongSelection();
+}
+/** 在尾部追加新歌，已存在则跳过。用于「导入文件」「阶段A 导入」时的「合并」语义。 */
+function appendSongsFromLines(lines: string[]) {
+  const oldMap = existingStatusMap(songItems.value);
+  const incoming = songItemsFromLines(lines);
+  const existingKeys = new Set(songItems.value.map((s) => songKeyFromItem(s)));
+  const added: SongItem[] = [];
+  for (const s of incoming) {
+    const key = songKeyFromItem(s);
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    const prev = oldMap.get(key);
+    added.push({ ...s, status: prev?.status ?? "pending", note: prev?.note });
+  }
+  if (!added.length) return 0;
+  songItems.value = [...songItems.value, ...added];
+  return added.length;
+}
+
 function importBoxesToSongs() {
   const lines: string[] = [];
   const byPair = new Map<number, { title?: string; artist?: string }>();
@@ -654,22 +943,19 @@ function importBoxesToSongs() {
     showInfoMessage("当前框无法整理出有效歌单");
     return;
   }
-  songsText.value = `${merged.join("\n")}\n`;
+  const before = songItems.value.length;
+  const added = appendSongsFromLines(merged);
+  showInfoMessage(`已合并到歌曲列表：新增 ${added} 首，跳过 ${merged.length - added} 首重复（当前共 ${before + added} 首）`);
   stage.value = "crawl";
-}
-function normalizeSongsText() {
-  const lines = structuredSongsFromLines(songsText.value.split(/\r?\n/));
-  songsText.value = `${lines.join("\n")}${lines.length ? "\n" : ""}`;
-  showInfoMessage(`已结构化并去重，共 ${lines.length} 首`);
 }
 async function importPlaylistFile() {
   const file = await invoke<string | null>("pick_text_file");
   if (!file) return;
   try {
     const text = await invoke<string>("read_text_file", { path: file });
-    const merged = structuredSongsFromLines([...songsText.value.split(/\r?\n/), ...text.split(/\r?\n/)]);
-    songsText.value = `${merged.join("\n")}${merged.length ? "\n" : ""}`;
-    showInfoMessage(`已导入并去重：${basename(file)}（共 ${merged.length} 首）`);
+    const merged = structuredSongsFromLines(text.split(/\r?\n/));
+    const added = appendSongsFromLines(merged);
+    showInfoMessage(`已导入并合并：${basename(file)}（新增 ${added} 首，当前共 ${songItems.value.length} 首）`);
   } catch (err) {
     showInfoMessage(`导入歌单失败：${err instanceof Error ? err.message : String(err)}`, 6000);
   }
@@ -677,58 +963,321 @@ async function importPlaylistFile() {
 
 async function loadSongs() {
   try {
-    songsText.value = await invoke<string>("read_workspace_file", { relativePath: ocrForm.output });
+    const text = await invoke<string>("read_workspace_file", { relativePath: ocrForm.output });
+    appendSongsFromLines(text.split(/\r?\n/));
   } catch {
-    songsText.value = "";
+    // 文件不存在时不动现有列表
   }
 }
-async function saveSongs() {
+/** 把 songItems 中「未下载 / 失败」的歌曲写入 crawlForm.input，跳过已成功项。
+ * 返回实际写入的歌曲数；为 0 时调用方应阻止启动。 */
+async function saveSongs(): Promise<number> {
   try {
-    normalizeSongsText();
-    const output = songsText.value;
-    await invoke("write_workspace_file", { relativePath: crawlForm.input, content: output });
-    showInfoMessage(`已写入 ${crawlForm.input}（${songs.value.length} 首）`);
+    const pending = songItems.value.filter((s) => s.status !== "success");
+    const text = pending.map((s) => songQuery(s)).join("\n") + (pending.length ? "\n" : "");
+    await invoke("write_workspace_file", { relativePath: crawlForm.input, content: text });
+    if (pending.length) {
+      const skipped = songItems.value.length - pending.length;
+      const skipHint = skipped > 0 ? `（已自动跳过 ${skipped} 首成功）` : "";
+      showInfoMessage(`已写入 ${crawlForm.input}：${pending.length} 首${skipHint}`);
+    }
+    return pending.length;
   } catch (err) {
     showInfoMessage(`写入 songs 失败：${err instanceof Error ? err.message : String(err)}`, 6000);
+    return 0;
   }
+}
+
+// ----- 多选交互 -----
+function clearSongSelection() {
+  selectedSongIds.value = new Set();
+  lastClickedSongId.value = "";
+}
+function onSongRowClick(item: SongItem, ev: MouseEvent) {
+  if (ev.shiftKey && lastClickedSongId.value) {
+    const ids = songItems.value.map((s) => s.id);
+    const a = ids.indexOf(lastClickedSongId.value);
+    const b = ids.indexOf(item.id);
+    if (a >= 0 && b >= 0) {
+      const [lo, hi] = a <= b ? [a, b] : [b, a];
+      const next = new Set(selectedSongIds.value);
+      for (let i = lo; i <= hi; i++) next.add(ids[i]);
+      selectedSongIds.value = next;
+      return;
+    }
+  }
+  if (ev.ctrlKey || ev.metaKey) {
+    const next = new Set(selectedSongIds.value);
+    if (next.has(item.id)) next.delete(item.id);
+    else next.add(item.id);
+    selectedSongIds.value = next;
+    lastClickedSongId.value = item.id;
+    return;
+  }
+  selectedSongIds.value = new Set([item.id]);
+  lastClickedSongId.value = item.id;
+}
+function removeSelectedSongs() {
+  if (!selectedSongIds.value.size) return;
+  const ids = selectedSongIds.value;
+  const kept = songItems.value.filter((s) => !ids.has(s.id));
+  const removed = songItems.value.length - kept.length;
+  songItems.value = kept;
+  clearSongSelection();
+  if (removed > 0) showInfoMessage(`已删除 ${removed} 首`);
+}
+function selectAllSongs() {
+  selectedSongIds.value = new Set(songItems.value.map((s) => s.id));
+  lastClickedSongId.value = songItems.value[songItems.value.length - 1]?.id ?? "";
+}
+function onSongListKeyDown(ev: KeyboardEvent) {
+  if (ev.key === "Delete" || ev.key === "Backspace") {
+    if (!selectedSongIds.value.size) return;
+    ev.preventDefault();
+    removeSelectedSongs();
+    return;
+  }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "a") {
+    ev.preventDefault();
+    selectAllSongs();
+  }
+}
+
+// ----- 批量编辑对话框 -----
+function openBulkEditor() {
+  songsText.value = songItemsToText(songItems.value);
+  showBulkEditor.value = true;
+}
+function closeBulkEditor() {
+  showBulkEditor.value = false;
+}
+function applyBulkEditor() {
+  const lines = songsText.value.split(/\r?\n/);
+  mergeSongsFromLines(lines);
+  showBulkEditor.value = false;
+  showInfoMessage(`已应用：当前 ${songItems.value.length} 首（未改文本的状态已保留）`);
+}
+
+// ----- Cookie 更新对话框 -----
+function openCookieDialog(trigger: "auto" | "manual" = "manual") {
+  cookieDialogTrigger.value = trigger;
+  cookieDialogText.value = "";
+  cookieDialogHint.value = "";
+  showCookieDialog.value = true;
+}
+function closeCookieDialog() {
+  if (cookieDialogSaving.value) return;
+  showCookieDialog.value = false;
+}
+async function openExternalSite() {
+  try {
+    await openUrl("https://www.2t58.com/");
+  } catch (err) {
+    cookieDialogHint.value = `打开浏览器失败：${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+/** 内部：保存当前 textarea 的 cookie。成功返回解析到的条数，失败抛错。 */
+async function saveCookieFromDialog(): Promise<number> {
+  const text = cookieDialogText.value.trim();
+  if (!text) throw new Error("请先粘贴 Cookie");
+  cookieDialogSaving.value = true;
+  try {
+    const count = await invoke<number>("update_2t58_cookies", { cookieText: text });
+    pushDebugLine("音乐爬取", "cookie-updated", `已写入 ${count} 条 2t58 Cookie`);
+    return count;
+  } finally {
+    cookieDialogSaving.value = false;
+  }
+}
+async function onlySaveCookie() {
+  try {
+    const n = await saveCookieFromDialog();
+    cookieDialogHint.value = `已保存 ${n} 条 Cookie 到 2t58_cookies.json`;
+    showInfoMessage(`Cookie 已更新（${n} 条）`);
+    runStore.ackSiteRateLimit();
+    setTimeout(() => {
+      showCookieDialog.value = false;
+    }, 600);
+  } catch (err) {
+    cookieDialogHint.value = err instanceof Error ? err.message : String(err);
+  }
+}
+async function saveCookieAndRetry() {
+  try {
+    const n = await saveCookieFromDialog();
+    cookieDialogHint.value = `已保存 ${n} 条 Cookie，正在重试失败项…`;
+    runStore.ackSiteRateLimit();
+    showCookieDialog.value = false;
+    if (runnableCount.value === 0) {
+      showInfoMessage(`Cookie 已更新（${n} 条），但目前没有失败/未爬取项可重试`);
+      return;
+    }
+    if (running.value) {
+      showInfoMessage(`Cookie 已更新（${n} 条）；当前还有任务在运行，请等结束后再点重新爬取`);
+      return;
+    }
+    await runCrawl();
+  } catch (err) {
+    cookieDialogHint.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+// ----- 持久化 -----
+async function persistSongs(immediate = false) {
+  const run = async () => {
+    try {
+      const payload = JSON.stringify(
+        songItems.value.map((s) => ({
+          song: s.song,
+          artist: s.artist,
+          status: s.status,
+          note: s.note ?? "",
+        })),
+        null,
+        2,
+      );
+      await invoke("write_workspace_file", { relativePath: SONGS_STATE_PATH, content: payload });
+    } catch (err) {
+      pushDebugLine("音乐爬取", "persist-songs-error", err instanceof Error ? err.message : String(err));
+    }
+  };
+  if (immediate) {
+    if (persistSongsTimer) {
+      clearTimeout(persistSongsTimer);
+      persistSongsTimer = null;
+    }
+    await run();
+    return;
+  }
+  if (persistSongsTimer) clearTimeout(persistSongsTimer);
+  persistSongsTimer = setTimeout(() => {
+    persistSongsTimer = null;
+    void run();
+  }, 400);
+}
+async function loadSongsState() {
+  try {
+    const text = await invoke<string>("read_workspace_file", { relativePath: SONGS_STATE_PATH });
+    const raw = JSON.parse(text) as Array<{ song?: string; artist?: string; status?: string; note?: string }>;
+    if (!Array.isArray(raw)) return;
+    const items: SongItem[] = [];
+    const seen = new Set<string>();
+    for (const r of raw) {
+      // 应用最新清理规则（去括号/播放量后缀等），让历史脏数据也能自动洗干净
+      const song = normalizeName(r.song ?? "");
+      const artist = normalizeName(r.artist ?? "");
+      if (!song) continue;
+      const key = songKeyFromItem({ song, artist });
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const status: SongStatus = r.status === "success" || r.status === "failed" ? r.status : "pending";
+      items.push({ id: makeSongId(), song, artist, status, note: r.note || undefined });
+    }
+    if (items.length) songItems.value = items;
+  } catch {
+    // 没有状态文件时不做任何事
+  }
+}
+
+// ----- 单首失败重试 -----
+/** 固定临时文件名，每次重试都覆盖，避免在 workspaces 目录里累积一堆 retry_*.txt。
+ * 路径相对于 workspace_root（默认就是 workspaces/music_crawl），脚本 input 参数也是同样相对解析。 */
+const SONGS_RETRY_RELATIVE = "songs_retry.txt";
+async function retrySong(item: SongItem) {
+  if (running.value || retryingSongId.value) return;
+  if (item.status === "success") return;
+  retryingSongId.value = item.id;
+  const line = songQuery(item);
+  try {
+    await invoke("write_workspace_file", {
+      relativePath: SONGS_RETRY_RELATIVE,
+      content: `${line}\n`,
+    });
+  } catch (err) {
+    retryingSongId.value = "";
+    showInfoMessage(`生成临时清单失败：${err instanceof Error ? err.message : String(err)}`, 6000);
+    return;
+  }
+  // 重试期间把这首歌标回 pending，等待日志更新
+  patchSongStatus(item.id, "pending", "正在重试…");
+  const params = { ...crawlForm, input: SONGS_RETRY_RELATIVE };
+  hideInfoMessage();
+  showInfoMessage(`正在重试：${line}`);
+  pushDebugLine("音乐爬取", "song-retry", `单首重试：${line}`, { params });
+  runStore.resetCrawl();
+  try {
+    await runStore.startTool("full_auto_download", params);
+  } catch (err) {
+    showInfoMessage(`重试启动失败：${err instanceof Error ? err.message : String(err)}`, 6000);
+    retryingSongId.value = "";
+  }
+}
+function patchSongStatus(id: string, status: SongStatus, note?: string) {
+  songItems.value = songItems.value.map((s) =>
+    s.id === id ? { ...s, status, note } : s,
+  );
 }
 async function runOcr() {
   if (running.value) return;
-  let imgs: MediaEntry[] = [];
-  try {
-    imgs = await invoke<MediaEntry[]>("list_media_files", { relativeDir: ocrForm.input });
-    if (!imgs.length) {
-      showInfoMessage(
-        `截图目录为空或不存在：${ocrForm.input}。请使用 playlist_ocr/images_in 或通过「选择文件夹」指定`,
-        8000,
-      );
+  let imgs: MediaEntry[] = images.value.length ? [...images.value] : [];
+  const useExplicitFiles = ocrInputSource.value === "files" && imgs.length > 0;
+
+  if (!useExplicitFiles) {
+    try {
+      if (!imgs.length) {
+        imgs = await invoke<MediaEntry[]>("list_media_files", { relativeDir: ocrInputFolder.value });
+      }
+      if (!imgs.length) {
+        showInfoMessage(
+          `截图目录为空或不存在：${ocrInputFolder.value}。请「选择文件夹」或「选择图片」`,
+          8000,
+        );
+        return;
+      }
+      ocrInputSource.value = "folder";
+      images.value = imgs;
+    } catch (err) {
+      showInfoMessage(`检查截图目录失败：${err instanceof Error ? err.message : String(err)}`, 6000);
       return;
     }
-  } catch (err) {
-    showInfoMessage(`检查截图目录失败：${err instanceof Error ? err.message : String(err)}`, 6000);
-    return;
   }
+
   hideInfoMessage();
   detecting.value = false;
   recognizing.value = false;
   runStore.beginBatchScan(imgs);
   const first = imgs[0]?.path;
   if (first) selectedImage.value = first;
-  try {
-    await runStore.startTool("playlist_ocr", {
-      ...ocrForm,
-      review: "playlist_ocr/songs_review.txt",
-      regionsDir: REGIONS_CACHE_DIR,
+  const params: Record<string, unknown> = {
+    ...ocrForm,
+    review: "playlist_ocr/songs_review.txt",
+    regionsDir: REGIONS_CACHE_DIR,
+  };
+  if (useExplicitFiles) {
+    params.images = imgs.map((img) => img.path).join("|");
+    pushDebugLine("歌单OCR", "scan-click", `开始批量扫描（自选 ${imgs.length} 张）`, {
+      names: imgs.map((i) => i.name),
     });
+  } else {
+    params.input = ocrInputFolder.value;
+    pushDebugLine("歌单OCR", "scan-click", `开始批量扫描（目录 ${ocrInputFolder.value}，${imgs.length} 张）`);
+  }
+  try {
+    await runStore.startTool("playlist_ocr", params);
   } catch (err) {
     showInfoMessage(`启动 OCR 失败：${err instanceof Error ? err.message : String(err)}`, 6000);
   }
 }
 async function runCrawl() {
   if (running.value) return;
-  await saveSongs();
+  const writtenCount = await saveSongs();
+  if (writtenCount <= 0) {
+    showInfoMessage("没有待下载的歌曲（全部已成功 / 列表为空）");
+    return;
+  }
   hideInfoMessage();
   runStore.resetBatch();
+  runStore.resetCrawl();
   try {
     await runStore.startTool("full_auto_download", { ...crawlForm });
   } catch (err) {
@@ -757,35 +1306,89 @@ watch(lastRegionsReady, (item) => {
 watch(
   () => runStore.lastExitCode,
   async (code) => {
-    if (code === null || runStore.lastFinishedPlugin !== "playlist_ocr") return;
-    if (code === 0) {
-      await loadSongs();
-      normalizeSongsText();
-      detecting.value = false;
-      showInfoMessage(`批量识别完成，共 ${songs.value.length} 首，可点选图片查看 OCR 框`);
-      if (selectedImage.value && !editableBoxes.value.length) {
-        await importRegionsFromCache(selectedImage.value);
+    if (code === null) return;
+    if (runStore.lastFinishedPlugin === "playlist_ocr") {
+      if (code === 0) {
+        await loadSongs();
+        detecting.value = false;
+        showInfoMessage(`批量识别完成，共 ${songs.value.length} 首，可点选图片查看 OCR 框`);
+        if (selectedImage.value && !editableBoxes.value.length) {
+          await importRegionsFromCache(selectedImage.value);
+        }
+      } else {
+        const tail = logs.value.filter(Boolean).slice(-3).join("；");
+        showInfoMessage(`批量识别失败（退出码 ${code}）${tail ? `：${tail}` : ""}`, 8000);
       }
-    } else {
-      const tail = logs.value.filter(Boolean).slice(-3).join("；");
-      showInfoMessage(`批量识别失败（退出码 ${code}）${tail ? `：${tail}` : ""}`, 8000);
+      return;
+    }
+    if (runStore.lastFinishedPlugin === "full_auto_download") {
+      // 重试结束后允许下一次重试；状态已经在 watch crawlStatuses 中实时同步
+      if (retryingSongId.value) {
+        retryingSongId.value = "";
+      }
+      const ok = songItems.value.filter((s) => s.status === "success").length;
+      const failed = songItems.value.filter((s) => s.status === "failed").length;
+      const pending = songItems.value.filter((s) => s.status === "pending").length;
+      if (code === 0) {
+        showInfoMessage(`下载结束：成功 ${ok}，失败 ${failed}，未处理 ${pending}`);
+      } else {
+        showInfoMessage(`爬取异常（退出码 ${code}）：成功 ${ok}，失败 ${failed}，未处理 ${pending}`, 8000);
+      }
+      void persistSongs(true);
     }
   },
 );
 
-onMounted(() => {
+/** 来自 store 的实时状态更新：把每首歌的最新成败写回 songItems。 */
+watch(
+  crawlStatuses,
+  (next) => {
+    if (!next || !songItems.value.length) return;
+    let changed = false;
+    const patched = songItems.value.map((s) => {
+      const r: CrawlSongResult | undefined = next[songKeyFromItem(s)];
+      if (!r) return s;
+      if (s.status === r.status && (s.note ?? "") === (r.note ?? "")) return s;
+      changed = true;
+      return { ...s, status: r.status, note: r.note };
+    });
+    if (changed) songItems.value = patched;
+  },
+  { deep: true },
+);
+
+/** songItems 任何变动 → 防抖持久化到 workspaces/music_crawl/songs_state.json。 */
+watch(
+  songItems,
+  () => {
+    void persistSongs();
+  },
+  { deep: true },
+);
+
+/** 后端日志命中 [site-limit] 时自动弹出更新 Cookie 对话框。
+ * 用 hitAt 时间戳触发，避免 store 同值二次写入时重复打开。 */
+watch(siteRateLimitHitAt, (hitAt) => {
+  if (!hitAt) return;
+  openCookieDialog("auto");
+});
+
+onMounted(async () => {
   window.addEventListener("mousemove", onGlobalMouseMove);
   window.addEventListener("mouseup", onGlobalMouseUp);
   void runStore.ensureListeners();
   void refreshImages();
   void loadPreviewImage();
-  void loadSongs();
+  // 先恢复持久化状态，再合并 songs.txt 中新增的（未持久化过的）行
+  await loadSongsState();
+  await loadSongs();
 });
 
 onBeforeUnmount(() => {
   if (dragRafId) cancelAnimationFrame(dragRafId);
   if (infoHideTimer) clearTimeout(infoHideTimer);
   if (infoClearTimer) clearTimeout(infoClearTimer);
+  if (persistSongsTimer) clearTimeout(persistSongsTimer);
   window.removeEventListener("mousemove", onGlobalMouseMove);
   window.removeEventListener("mouseup", onGlobalMouseUp);
 });
@@ -793,37 +1396,43 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="relative flex min-h-0 flex-1 flex-col p-6">
-    <button
-      type="button"
-      class="mb-6 flex w-fit items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-accent"
-      @click="router.push('/')"
-    >
-      <Icon icon="mdi:arrow-left" />
-      返回首页
-    </button>
+    <div class="mb-4 flex items-center gap-2">
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-accent"
+        @click="router.push('/')"
+      >
+        <Icon icon="mdi:arrow-left" />
+        返回首页
+      </button>
+
+      <div class="ml-2 flex gap-1.5">
+        <button
+          type="button"
+          class="rounded-lg px-3 py-1.5 text-sm transition"
+          :class="stage === 'ocr' ? 'bg-accent text-black' : 'bg-black/30 text-zinc-300 hover:bg-black/40'"
+          @click="stage = 'ocr'"
+        >
+          阶段A 识图校对
+        </button>
+        <button
+          type="button"
+          class="rounded-lg px-3 py-1.5 text-sm transition"
+          :class="stage === 'crawl' ? 'bg-accent text-black' : 'bg-black/30 text-zinc-300 hover:bg-black/40'"
+          @click="stage = 'crawl'"
+        >
+          阶段B 一键爬取
+        </button>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2 text-sm">
+        <Icon icon="mdi:music" class="h-5 w-5 text-accent" />
+        <span class="font-semibold text-zinc-100">一键爬取音乐</span>
+        <span class="text-xs text-zinc-500">M2.5</span>
+      </div>
+    </div>
 
     <div v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { duration: 0.4 } }" class="flex min-h-0 flex-1 flex-col gap-4">
-      <div class="flex items-center justify-between rounded-xl border border-border bg-surface-elevated/50 px-4 py-3">
-        <h2 class="text-xl font-semibold">一键爬取音乐（M2.5）</h2>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm"
-            :class="stage === 'ocr' ? 'bg-accent text-black' : 'bg-black/30 text-zinc-300'"
-            @click="stage = 'ocr'"
-          >
-            阶段A 识图校对
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm"
-            :class="stage === 'crawl' ? 'bg-accent text-black' : 'bg-black/30 text-zinc-300'"
-            @click="stage = 'crawl'"
-          >
-            阶段B 一键爬取
-          </button>
-        </div>
-      </div>
 
       <div v-if="stage === 'ocr'" class="grid min-h-0 flex-1 grid-cols-12 items-stretch gap-4">
         <section class="col-span-3 min-h-0 rounded-xl border border-border bg-black/20 p-4">
@@ -894,10 +1503,10 @@ onBeforeUnmount(() => {
             拖拽单张图片到此处可直接载入
           </div>
           <div class="space-y-3 text-sm">
-            <label class="block">
-              <span class="mb-1 block text-xs text-zinc-500">截图文件夹</span>
-              <input v-model="ocrForm.input" class="w-full rounded border border-border bg-black/40 px-2 py-1.5" placeholder="playlist_ocr/images_in" />
-            </label>
+            <p v-if="images.length" class="text-xs text-zinc-500">
+              已载入 {{ images.length }} 张截图
+              <span v-if="ocrInputSource === 'files'">（自选图片）</span>
+            </p>
             <label class="block">
               <span class="mb-1 block text-xs text-zinc-500">歌单输出文件</span>
               <input v-model="ocrForm.output" class="w-full rounded border border-border bg-black/40 px-2 py-1.5" placeholder="songs.txt" />
@@ -941,7 +1550,7 @@ onBeforeUnmount(() => {
                 取消
               </button>
             </div>
-            <p v-if="ocrBatchActive" class="text-xs text-zinc-500">将识别文件夹内全部截图，左侧可查看每张进度</p>
+            <p v-if="ocrBatchActive" class="text-xs text-zinc-500">正在识别已载入的截图，左侧可查看每张进度</p>
           </div>
         </section>
 
@@ -1062,49 +1671,241 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else class="grid min-h-0 flex-1 grid-cols-12 gap-4">
-        <section class="col-span-5 rounded-xl border border-border bg-black/20 p-4">
+        <section class="col-span-5 flex min-h-0 flex-col rounded-xl border border-border bg-black/20 p-4">
           <div class="mb-3 flex items-center justify-between">
-            <h3 class="text-sm font-medium text-zinc-300">歌曲列表（OCR 汇总）</h3>
-            <span class="text-xs text-zinc-500">{{ songs.length }} 首</span>
+            <h3 class="text-sm font-medium text-zinc-300">歌曲列表</h3>
+            <span class="text-xs text-zinc-500">
+              共 {{ songItems.length }} 首
+              · <span class="text-emerald-400">成功 {{ successCount }}</span>
+              · <span class="text-red-400">失败 {{ failedCount }}</span>
+              · <span class="text-zinc-400">未下载 {{ pendingCount }}</span>
+            </span>
           </div>
-          <textarea
-            v-model="songsText"
-            class="h-[420px] w-full rounded border border-border bg-black/40 p-2 text-sm"
-            placeholder="每行一首：歌名-歌手"
-          />
-          <div class="mt-2 flex gap-2">
-            <button type="button" class="rounded border border-border px-3 py-1.5 text-sm" @click="loadSongs">重新读取</button>
-            <button type="button" class="rounded border border-border px-3 py-1.5 text-sm" @click="saveSongs">写入 songs</button>
-            <button type="button" class="rounded border border-border px-3 py-1.5 text-sm" @click="normalizeSongsText">结构化去重</button>
-            <button type="button" class="rounded border border-border px-3 py-1.5 text-sm" @click="importPlaylistFile">导入已有歌单</button>
+          <div
+            ref="songListEl"
+            tabindex="0"
+            class="song-list relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded border border-border bg-black/40 p-2 pb-12 text-sm outline-none focus:ring-1 focus:ring-accent/40"
+            @keydown="onSongListKeyDown"
+            @click.self="clearSongSelection"
+          >
+            <p v-if="!songItems.length" class="px-2 py-6 text-center text-xs text-zinc-500">
+              暂无歌曲，点「批量编辑」粘贴歌单，或从「导入已有歌单」读入文件。
+            </p>
+            <div
+              v-for="item in songItems"
+              :key="item.id"
+              class="song-row group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition"
+              :class="[
+                selectedSongIds.has(item.id)
+                  ? 'bg-accent/20 ring-1 ring-accent/40'
+                  : 'hover:bg-white/5',
+                crawlCurrentQuery && songQueryKey(crawlCurrentQuery) === songQueryKey(`${item.song}-${item.artist}`)
+                  ? 'ring-1 ring-cyan-300/60'
+                  : '',
+              ]"
+              @click="onSongRowClick(item, $event)"
+            >
+              <span class="min-w-0 flex-1 truncate">
+                <span class="text-zinc-200">{{ item.song }}</span>
+                <span v-if="item.artist" class="text-zinc-500"> - {{ item.artist }}</span>
+              </span>
+              <button
+                v-if="item.status === 'failed'"
+                type="button"
+                class="shrink-0 rounded p-0.5 text-red-400 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                :title="`失败：${item.note ?? ''}（点击重试这一首）`"
+                :disabled="running || !!retryingSongId"
+                @click.stop="retrySong(item)"
+              >
+                <Icon
+                  :icon="retryingSongId === item.id ? 'mdi:loading' : 'mdi:close-circle'"
+                  :class="['h-5 w-5', retryingSongId === item.id ? 'animate-spin' : '']"
+                />
+              </button>
+              <Icon
+                v-else-if="item.status === 'success'"
+                icon="mdi:check-circle"
+                class="h-5 w-5 shrink-0 text-emerald-400"
+                :title="item.note ? `成功：${item.note}` : '已下载'"
+              />
+              <Icon
+                v-else
+                icon="mdi:circle-outline"
+                class="h-5 w-5 shrink-0 text-zinc-500"
+                :title="item.note || '未下载'"
+              />
+            </div>
+            <div
+              class="song-toolbar pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-2"
+              title="批量操作：单选 · Ctrl/⌘ 切换 · Shift 区间 · Delete 删除 · Ctrl/⌘+A 全选"
+            >
+              <button
+                type="button"
+                class="song-icon-btn pointer-events-auto"
+                title="批量编辑（在弹窗里粘贴/修改一大段歌单，保存时按文本匹配保留状态）"
+                @click="openBulkEditor"
+              >
+                <Icon icon="mdi:pencil" class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                class="song-icon-btn pointer-events-auto"
+                title="导入已有歌单（从 .txt / .csv 合并进来）"
+                @click="importPlaylistFile"
+              >
+                <Icon icon="mdi:tray-arrow-down" class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                class="song-icon-btn pointer-events-auto relative"
+                :title="selectedSongIds.size ? `删除选中（${selectedSongIds.size}）` : '删除选中（也可按 Delete）'"
+                :disabled="!selectedSongIds.size"
+                @click="removeSelectedSongs"
+              >
+                <Icon icon="mdi:delete" class="h-5 w-5" />
+                <span
+                  v-if="selectedSongIds.size"
+                  class="absolute -right-1 -top-1 min-w-[16px] rounded-full bg-red-500/90 px-1 text-[10px] font-semibold leading-4 text-white"
+                >
+                  {{ selectedSongIds.size }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="song-icon-btn pointer-events-auto"
+                title="全选（也可按 Ctrl/⌘+A）"
+                :disabled="!songItems.length"
+                @click="selectAllSongs"
+              >
+                <Icon icon="mdi:check-all" class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                class="song-icon-btn pointer-events-auto"
+                title="取消选中"
+                :disabled="!selectedSongIds.size"
+                @click="clearSongSelection"
+              >
+                <Icon icon="mdi:close" class="h-5 w-5" />
+              </button>
+            </div>
           </div>
-          <p class="mt-2 text-xs text-zinc-500">会自动整理为“歌名-歌手”格式并去重</p>
         </section>
 
         <section class="col-span-7 rounded-xl border border-border bg-black/20 p-4">
           <h3 class="mb-3 text-sm font-medium text-zinc-300">一键爬取参数</h3>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <input v-model="crawlForm.input" class="rounded border border-border bg-black/40 px-2 py-1.5" placeholder="--input" />
-            <input v-model="crawlForm.output" class="rounded border border-border bg-black/40 px-2 py-1.5" placeholder="--output" />
-            <input v-model="crawlForm.downloadDir" class="rounded border border-border bg-black/40 px-2 py-1.5" placeholder="--download-dir" />
-            <select v-model="crawlForm.mode" class="rounded border border-border bg-black/40 px-2 py-1.5">
-              <option value="A">A</option>
-              <option value="B">B</option>
-            </select>
-            <select v-model="crawlForm.bMethod" class="rounded border border-border bg-black/40 px-2 py-1.5">
-              <option value="http">http</option>
-              <option value="browser">browser</option>
-            </select>
-            <input v-model.number="crawlForm.delay" type="number" step="0.1" class="rounded border border-border bg-black/40 px-2 py-1.5" placeholder="--delay" />
-            <input v-model.number="crawlForm.timeout" type="number" class="rounded border border-border bg-black/40 px-2 py-1.5" placeholder="--timeout" />
-            <div class="flex items-center gap-3 text-zinc-300">
-              <label class="flex items-center gap-1"><input v-model="crawlForm.linksOnly" type="checkbox" /> links-only</label>
-              <label class="flex items-center gap-1"><input v-model="crawlForm.manualLoginOnce" type="checkbox" /> manual-login-once</label>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+            <label class="block">
+              <span class="mb-1 block text-xs text-zinc-500">输入歌单文件（每行 歌名-歌手）</span>
+              <div class="flex gap-2">
+                <input
+                  v-model="crawlForm.input"
+                  class="min-w-0 flex-1 rounded border border-border bg-black/40 px-2 py-1.5"
+                  placeholder="songs.txt"
+                />
+                <button
+                  type="button"
+                  class="song-icon-btn shrink-0"
+                  :disabled="pickingDialog"
+                  title="打开资源管理器选择歌单文件（.txt / .csv）"
+                  @click="pickInputSongFile"
+                >
+                  <Icon icon="mdi:file-document-outline" class="h-5 w-5" />
+                </button>
+              </div>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-xs text-zinc-500">结果 CSV（含夸克链接/状态）</span>
+              <div class="flex gap-2">
+                <input
+                  v-model="crawlForm.output"
+                  class="min-w-0 flex-1 rounded border border-border bg-black/40 px-2 py-1.5"
+                  placeholder="quark_results.csv"
+                />
+                <button
+                  type="button"
+                  class="song-icon-btn shrink-0"
+                  :disabled="pickingDialog"
+                  title="选择结果 CSV 保存位置"
+                  @click="pickOutputCsvFile"
+                >
+                  <Icon icon="mdi:file-document-outline" class="h-5 w-5" />
+                </button>
+              </div>
+            </label>
+            <label class="block col-span-2">
+              <span class="mb-1 block text-xs text-zinc-500">下载目录（音乐文件落地位置）</span>
+              <div class="flex gap-2">
+                <input
+                  v-model="crawlForm.downloadDir"
+                  class="min-w-0 flex-1 rounded border border-border bg-black/40 px-2 py-1.5"
+                  placeholder="downloads"
+                />
+                <button
+                  type="button"
+                  class="song-icon-btn shrink-0"
+                  :disabled="pickingDialog"
+                  title="打开资源管理器选择下载目录"
+                  @click="pickDownloadDir"
+                >
+                  <Icon icon="mdi:folder-outline" class="h-5 w-5" />
+                </button>
+              </div>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-xs text-zinc-500">下载来源</span>
+              <select v-model="crawlForm.mode" class="w-full rounded border border-border bg-black/40 px-2 py-1.5">
+                <option value="A">A · 网盘（夸克，默认）</option>
+                <option value="B">B · 网站本地 MP3</option>
+              </select>
+            </label>
+            <label class="block" :class="{ 'opacity-50': crawlForm.mode !== 'B' }">
+              <span class="mb-1 block text-xs text-zinc-500">B 模式下载方式（仅 B 生效）</span>
+              <select
+                v-model="crawlForm.bMethod"
+                :disabled="crawlForm.mode !== 'B'"
+                class="w-full rounded border border-border bg-black/40 px-2 py-1.5"
+              >
+                <option value="http">http（HTTP 直下，推荐）</option>
+                <option value="browser">browser（浏览器点击下载）</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-xs text-zinc-500">请求间隔（秒）·防反爬，建议 0.5–2</span>
+              <input v-model.number="crawlForm.delay" type="number" step="0.1" min="0" class="w-full rounded border border-border bg-black/40 px-2 py-1.5" placeholder="0.8" />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-xs text-zinc-500">页面超时（秒）·网络慢可调大</span>
+              <input v-model.number="crawlForm.timeout" type="number" min="5" class="w-full rounded border border-border bg-black/40 px-2 py-1.5" placeholder="40" />
+            </label>
+            <div class="col-span-2 flex flex-wrap items-start gap-x-5 gap-y-2 rounded border border-border/60 bg-black/20 px-3 py-2 text-zinc-300">
+              <label class="flex items-start gap-2">
+                <input v-model="crawlForm.linksOnly" type="checkbox" class="mt-1" />
+                <span class="text-xs">
+                  <span class="block text-zinc-200">仅收集链接，不下载</span>
+                  <span class="text-zinc-500">两种模式都可用：只写 CSV 链接，不真正下载文件</span>
+                </span>
+              </label>
+              <button
+                type="button"
+                class="flex items-center gap-1.5 rounded border border-border bg-black/30 px-2.5 py-1 text-xs text-zinc-200 hover:border-accent/60 hover:text-accent"
+                title="B 模式遇到 2t58「今日下载次数已达上限」时，去网站完成口令后回到这里更新 Cookie"
+                @click="openCookieDialog('manual')"
+              >
+                <Icon icon="mdi:cookie-edit-outline" class="h-4 w-4" />
+                更新 2t58 Cookie
+              </button>
             </div>
           </div>
           <div class="mt-3 flex gap-2">
-            <button type="button" class="rounded bg-accent px-3 py-1.5 text-sm text-black" :disabled="running || songs.length === 0" @click="runCrawl">
-              {{ running ? "运行中..." : "确认歌单并开始爬取" }}
+            <button
+              type="button"
+              class="rounded bg-accent px-3 py-1.5 text-sm text-black disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="running || runnableCount === 0"
+              :title="runnableCount === 0 ? '全部歌曲都已成功 / 列表为空' : ''"
+              @click="runCrawl"
+            >
+              {{ crawlButtonLabel }}
             </button>
             <button type="button" class="rounded border border-border px-3 py-1.5 text-sm" :disabled="!running" @click="cancelRun">取消</button>
           </div>
@@ -1120,6 +1921,131 @@ onBeforeUnmount(() => {
     <Transition name="info-toast">
       <div v-if="infoMessage && infoVisible" class="info-toast" :title="infoMessage">
         {{ infoMessage }}
+      </div>
+    </Transition>
+
+    <Transition name="bulk-modal">
+      <div v-if="showCookieDialog" class="bulk-modal-backdrop" @click.self="closeCookieDialog">
+        <div class="bulk-modal" role="dialog" aria-modal="true">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="flex items-center gap-2 text-base font-semibold text-zinc-100">
+              <Icon
+                :icon="cookieDialogTrigger === 'auto' ? 'mdi:alert-circle-outline' : 'mdi:cookie-edit-outline'"
+                :class="cookieDialogTrigger === 'auto' ? 'h-5 w-5 text-amber-400' : 'h-5 w-5 text-accent'"
+              />
+              {{ cookieDialogTrigger === 'auto' ? '2t58 下载受限，需要更新 Cookie' : '更新 2t58 Cookie' }}
+            </h3>
+            <button
+              type="button"
+              class="rounded p-1 text-zinc-400 hover:bg-white/5 hover:text-zinc-100 disabled:opacity-50"
+              :disabled="cookieDialogSaving"
+              title="关闭"
+              @click="closeCookieDialog"
+            >
+              <Icon icon="mdi:close" class="h-5 w-5" />
+            </button>
+          </div>
+          <p v-if="cookieDialogTrigger === 'auto' && siteRateLimitMessage" class="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100">
+            {{ siteRateLimitMessage }}
+          </p>
+          <ol class="mb-3 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-zinc-300">
+            <li>
+              点
+              <button type="button" class="mx-1 inline-flex items-center gap-1 rounded border border-border bg-black/30 px-2 py-0.5 text-zinc-200 hover:border-accent/60 hover:text-accent" @click="openExternalSite">
+                <Icon icon="mdi:open-in-new" class="h-3.5 w-3.5" />
+                打开 2t58.com
+              </button>
+              在浏览器完成口令验证（必要时按提示输入数字 / 滑动等）。
+            </li>
+            <li>
+              按 <kbd class="rounded bg-black/40 px-1.5">F12</kbd> 打开开发者工具 → <span class="text-zinc-100">Network</span> 选项卡 → 刷新页面 → 任选一条 2t58 请求 → 在 <span class="text-zinc-100">Request Headers</span> 中复制整行 <code class="rounded bg-black/40 px-1">Cookie:</code> 之后的内容。
+            </li>
+            <li>粘贴到下方输入框，点「保存并重试」即可继续下载。</li>
+          </ol>
+          <label class="mb-1 block text-xs text-zinc-400">从浏览器粘贴 Cookie：</label>
+          <textarea
+            v-model="cookieDialogText"
+            class="h-[180px] w-full rounded border border-border bg-black/40 p-2 text-xs"
+            placeholder="例如：PHPSESSID=xxxx; cf_clearance=yyyy; token=zzzz; ..."
+            spellcheck="false"
+          />
+          <p
+            v-if="cookieDialogHint"
+            class="mt-2 rounded border border-border/60 bg-black/30 px-2 py-1.5 text-xs text-zinc-300"
+          >
+            {{ cookieDialogHint }}
+          </p>
+          <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              class="rounded border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+              :disabled="cookieDialogSaving"
+              @click="closeCookieDialog"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rounded border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+              :disabled="cookieDialogSaving || !cookieDialogText.trim()"
+              @click="onlySaveCookie"
+            >
+              {{ cookieDialogSaving ? "保存中…" : "仅保存 Cookie" }}
+            </button>
+            <button
+              type="button"
+              class="rounded bg-accent px-3 py-1.5 text-sm text-black disabled:opacity-50"
+              :disabled="cookieDialogSaving || !cookieDialogText.trim() || running || runnableCount === 0"
+              :title="runnableCount === 0 ? '当前没有失败 / 未爬取项可重试' : ''"
+              @click="saveCookieAndRetry"
+            >
+              {{ cookieDialogSaving ? "保存中…" : "保存并重试失败项" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition name="bulk-modal">
+      <div v-if="showBulkEditor" class="bulk-modal-backdrop" @click.self="closeBulkEditor">
+        <div class="bulk-modal" role="dialog" aria-modal="true">
+          <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-zinc-100">批量编辑歌单</h3>
+            <button
+              type="button"
+              class="rounded p-1 text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
+              title="关闭"
+              @click="closeBulkEditor"
+            >
+              <Icon icon="mdi:close" class="h-5 w-5" />
+            </button>
+          </div>
+          <p class="mb-2 text-xs leading-relaxed text-zinc-400">
+            每行一首，格式 <span class="text-zinc-200">歌名-歌手</span>。保存时以「歌名-歌手」匹配原状态：
+            未改的行保留下载结果，改了文本的视为新歌（状态重置），删掉的行连同状态一起丢失。
+          </p>
+          <textarea
+            v-model="songsText"
+            class="h-[360px] w-full rounded border border-border bg-black/40 p-2 text-sm"
+            placeholder="每行一首：歌名-歌手"
+          />
+          <div class="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded border border-border px-3 py-1.5 text-sm"
+              @click="closeBulkEditor"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rounded bg-accent px-3 py-1.5 text-sm text-black"
+              @click="applyBulkEditor"
+            >
+              保存
+            </button>
+          </div>
+        </div>
       </div>
     </Transition>
   </div>
@@ -1190,5 +2116,95 @@ button:disabled {
 .info-toast-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+
+.song-list {
+  min-height: 320px;
+  max-height: calc(100vh - 320px);
+}
+
+.song-row {
+  user-select: none;
+}
+
+/* icon 按钮：背景半透明（透出页面背景），但图标保持完全不透明、高对比度。
+ * 用比全局 `button:disabled { opacity }` 更高优先级的选择器，避免 icon 图案被整体淡掉。 */
+button.song-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(63 63 70 / 0.9);
+  background: rgb(0 0 0 / 0.45);
+  color: rgb(244 244 245);
+  opacity: 1;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.12s ease,
+    box-shadow 0.2s ease;
+}
+
+button.song-icon-btn:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.6);
+  color: rgb(34 211 238);
+  border-color: rgb(34 211 238 / 0.6);
+  box-shadow: 0 0 0 1px rgb(34 211 238 / 0.3);
+}
+
+button.song-icon-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* disabled 状态：背景更淡、图标降色，但都保持完全不透明，确保图案可见。 */
+button.song-icon-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: rgb(0 0 0 / 0.25);
+  border-color: rgb(63 63 70 / 0.5);
+  color: rgb(161 161 170);
+}
+
+.bulk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(4px);
+  padding: 1.5rem;
+}
+
+.bulk-modal {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 6rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(63 63 70 / 0.95);
+  background: rgb(24 24 27 / 0.96);
+  padding: 1.25rem;
+  box-shadow: 0 24px 48px rgb(0 0 0 / 0.55);
+}
+
+.bulk-modal textarea {
+  flex: 1 1 auto;
+}
+
+.bulk-modal-enter-active,
+.bulk-modal-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.bulk-modal-enter-from,
+.bulk-modal-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
 }
 </style>

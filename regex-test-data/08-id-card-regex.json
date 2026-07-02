@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "position_char_1",
+      "type": "position_char",
+      "position": {
+        "x": 0,
+        "y": 60
+      },
+      "params": {
+        "mode": "range",
+        "literal": "",
+        "rangeFrom": "1",
+        "rangeTo": "9"
+      }
+    },
+    {
+      "id": "char_run_2",
+      "type": "char_run",
+      "position": {
+        "x": 120,
+        "y": 60
+      },
+      "params": {
+        "kind": "digit",
+        "n": 5
+      }
+    },
+    {
+      "id": "char_run_3",
+      "type": "char_run",
+      "position": {
+        "x": 240,
+        "y": 60
+      },
+      "params": {
+        "kind": "digit",
+        "n": 11
+      }
+    },
+    {
+      "id": "char_class_seg_4",
+      "type": "char_class_seg",
+      "position": {
+        "x": 360,
+        "y": 60
+      },
+      "params": {
+        "preset": "custom",
+        "customClass": "0-9Xx",
+        "quantifier": "one"
+      }
+    },
+    {
+      "id": "scope_5",
+      "type": "scope",
+      "position": {
+        "x": 360,
+        "y": 120
+      },
+      "params": {
+        "mode": "line"
+      }
+    },
+    {
+      "id": "root_6",
+      "type": "root",
+      "position": {
+        "x": 540,
+        "y": 120
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seg_0",
+      "source": "position_char_1",
+      "sourceHandle": "next",
+      "target": "char_run_2",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_seg_1",
+      "source": "char_run_2",
+      "sourceHandle": "next",
+      "target": "char_run_3",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_seg_2",
+      "source": "char_run_3",
+      "sourceHandle": "next",
+      "target": "char_class_seg_4",
+      "targetHandle": "segment_in"
+    },
+    {
+      "id": "edge_predicate",
+      "source": "char_class_seg_4",
+      "sourceHandle": "out",
+      "target": "scope_5",
+      "targetHandle": "predicate"
+    },
+    {
+      "id": "edge_root",
+      "source": "scope_5",
+      "sourceHandle": "bool",
+      "target": "root_6",
+      "targetHandle": "in"
+    }
+  ]
+}

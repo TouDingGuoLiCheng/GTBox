@@ -7,9 +7,9 @@
   "icon": "mdi:download-circle-outline",
   "tags": ["long-task", "download"],
   "script": {
-    "entry": "full_auto_download_2t58.py",
+    "entry": "music_crawl/full_auto_download_2t58.py",
     "interpreter": "venv",
-    "cwd": "."
+    "cwd": "music_crawl"
   },
   "params": [
     {
@@ -37,7 +37,7 @@
       "name": "mode",
       "label": "下载模式",
       "type": "select",
-      "default": "B",
+      "default": "A",
       "flag": "--mode",
       "options": ["A", "B"]
     },
