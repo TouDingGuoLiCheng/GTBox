@@ -6,6 +6,7 @@ import csv
 import json
 import re
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -315,12 +316,12 @@ def resolve_images_from_args(args: argparse.Namespace, base_dir: Path) -> tuple[
                 paths.append(p.resolve())
             else:
                 print(f"[OCR] 跳过无效路径: {part}", file=sys.stderr)
-        print(f"[OCR] 输入模式: 指定文件列表，有效 {len(paths)} 张")
+        print(f"[OCR] 输入模式: 指定文件列表，有效 {len(paths)} 张", flush=True)
         return sorted(paths), None
 
     input_dir = Path(args.input) if args.input else (base_dir / "images_in")
     found = get_images(input_dir)
-    print(f"[OCR] 输入模式: 目录扫描 {input_dir}，找到 {len(found)} 张")
+    print(f"[OCR] 输入模式: 目录扫描 {input_dir}，找到 {len(found)} 张", flush=True)
     return found, input_dir
 
 
@@ -479,15 +480,42 @@ def check_paddle_device(requested: str) -> str:
     return requested
 
 
-def build_ocr(device: str = "auto") -> Any:
+def emit_ocr_progress(percent: int, message: str) -> None:
+    pct = max(0, min(100, int(percent)))
+    print(f"[OCR-PROGRESS] {pct} {message}", flush=True)
+
+
+def _tick_engine_load_progress(stop: threading.Event, lo: int, hi: int) -> None:
+    span = max(1, hi - lo)
+    tick_lo = lo + int(span * 0.55)
+    tick_hi = lo + int(span * 0.95)
+    percent = tick_lo
+    while not stop.is_set() and percent < tick_hi:
+        emit_ocr_progress(percent, "正在加载识别引擎…")
+        if stop.wait(2.0):
+            break
+        percent += max(1, (tick_hi - tick_lo) // 8)
+
+
+def build_ocr(device: str = "auto", *, progress_lo: int = 2, progress_hi: int = 18) -> Any:
+    lo = max(0, min(progress_lo, 99))
+    hi = max(lo + 1, min(progress_hi, 99))
+    span = hi - lo
+
+    def scale(frac: float) -> int:
+        return lo + int(span * max(0.0, min(1.0, frac)))
+
+    emit_ocr_progress(scale(0.0), "正在检查 PaddleOCR 环境…")
     try:
         from paddleocr import PaddleOCR
     except ImportError:
         print("未安装 paddleocr，请先执行: pip install -r requirements-ocr.txt")
         sys.exit(2)
 
+    emit_ocr_progress(scale(0.15), "正在检测 OCR 设备…")
     effective_device = check_paddle_device(device)
-    print(f"OCR 设备: {effective_device}")
+    print(f"OCR 设备: {effective_device}", flush=True)
+    emit_ocr_progress(scale(0.35), f"设备已确定：{effective_device}")
 
     base_kwargs = {
         "lang": "ch",
@@ -503,12 +531,25 @@ def build_ocr(device: str = "auto") -> Any:
         {"lang": "ch", "enable_mkldnn": False},
     ]
     last_error: Exception | None = None
-    for kwargs in init_candidates:
-        try:
-            return PaddleOCR(**kwargs)
-        except (TypeError, ValueError) as exc:
-            last_error = exc
-    raise RuntimeError(f"无法初始化 PaddleOCR: {last_error}")
+    emit_ocr_progress(scale(0.45), "正在加载识别引擎（首次运行可能需下载模型，请耐心等待）…")
+    stop_tick = threading.Event()
+    tick_thread = threading.Thread(target=_tick_engine_load_progress, args=(stop_tick, lo, hi), daemon=True)
+    tick_thread.start()
+    ocr: Any | None = None
+    try:
+        for kwargs in init_candidates:
+            try:
+                ocr = PaddleOCR(**kwargs)
+                break
+            except (TypeError, ValueError) as exc:
+                last_error = exc
+    finally:
+        stop_tick.set()
+        tick_thread.join(timeout=0.2)
+    if ocr is None:
+        raise RuntimeError(f"无法初始化 PaddleOCR: {last_error}")
+    emit_ocr_progress(hi, "识别引擎就绪")
+    return ocr
 
 
 def is_layout_noise_box(box: OcrBox, image_w: int, cfg: dict[str, Any]) -> bool:
@@ -1483,16 +1524,23 @@ def run(args: argparse.Namespace) -> int:
         f"output={output_path} regions_dir={regions_dir or '(无)'}",
         flush=True,
     )
-    ocr = build_ocr(device=args.device)
+    total_images = len(images)
+    emit_ocr_progress(0, f"共 {total_images} 张截图待识别")
+    ocr = build_ocr(device=args.device, progress_lo=2, progress_hi=18)
     all_tracks: list[TrackCandidate] = []
     all_reviews: list[ReviewItem] = []
 
     for idx, image_path in enumerate(images, start=1):
-        print(f"[OCR] ({idx}/{len(images)}) 开始处理: {image_path.name}", flush=True)
+        scan_lo = 18 + int((idx - 1) / total_images * 72)
+        scan_hi = 18 + int(idx / total_images * 72)
+        scan_mid = scan_lo + max(1, (scan_hi - scan_lo) // 2)
+        print(f"[OCR] ({idx}/{total_images}) 开始处理: {image_path.name}", flush=True)
+        emit_ocr_progress(scan_lo, f"({idx}/{total_images}) 读取截图: {image_path.name}")
         img = read_image_unicode(image_path)
         if img is None:
             print(f"[OCR] [{image_path.name}] 读取失败，跳过", file=sys.stderr)
             all_reviews.append(ReviewItem(reason="read_failed", text=image_path.name, image_name=image_path.name))
+            emit_ocr_progress(scan_hi, f"({idx}/{total_images}) 跳过：读取失败")
             continue
         original_h = img.shape[0]
         original_w = img.shape[1]
@@ -1500,6 +1548,7 @@ def run(args: argparse.Namespace) -> int:
         img = apply_status_bar_crop(img, cfg)
         image_h, image_w = img.shape[:2]
         print(f"[OCR] [{image_path.name}] 裁切后尺寸 {image_w}x{image_h}，运行 PaddleOCR…", flush=True)
+        emit_ocr_progress(scan_mid, f"({idx}/{total_images}) PaddleOCR 识别中: {image_path.name}")
         raw = run_ocr(ocr, img, image_path)
         boxes = filter_layout_boxes(
             parse_ocr_boxes(raw, float(cfg.get("min_ocr_score", 0.55))), image_w, cfg
@@ -1534,6 +1583,10 @@ def run(args: argparse.Namespace) -> int:
             flush=True,
         )
         print(f"[{image_path.name}] 识别: {len(tracks)} 首, review: {len(reviews)} 条", flush=True)
+        emit_ocr_progress(
+            scan_hi,
+            f"({idx}/{total_images}) 完成: {len(tracks)} 首, review {len(reviews)} 条",
+        )
 
     eval_tracks = list(all_tracks)
     all_tracks = dedupe_tracks(all_tracks) if args.dedupe else all_tracks
@@ -1544,14 +1597,17 @@ def run(args: argparse.Namespace) -> int:
         for line in lines:
             print(line)
     else:
+        emit_ocr_progress(93, "正在写入 songs.txt…")
         final_lines = write_output(output_path, all_tracks, merge_mode=args.merge, dedupe=args.dedupe)
         print(f"\nsongs.txt 已写入: {output_path} ({len(final_lines)} 行)")
 
+    emit_ocr_progress(97, "正在写入 review…")
     write_review(review_path, all_reviews)
     print(f"review 已写入: {review_path} ({len(all_reviews)} 条)")
     if pred_csv_path:
         write_predictions_csv(pred_csv_path, eval_tracks)
         print(f"预测明细已写入: {pred_csv_path} ({len(eval_tracks)} 行)")
+    emit_ocr_progress(100, f"全部完成：识别 {total_images} 张，输出 {len(lines)} 行歌单")
     return 0
 
 

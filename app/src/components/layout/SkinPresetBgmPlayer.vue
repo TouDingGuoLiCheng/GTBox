@@ -3,6 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAppearanceStore } from "../../stores/appearance";
+import { pushMediaDebug } from "../../utils/mediaDebug";
 
 const appearance = useAppearanceStore();
 const route = useRoute();
@@ -52,13 +53,26 @@ async function loadBgmUrl() {
   const subpath = activeBgm.value?.workspaceSubpath;
   if (!subpath) {
     bgmUrl.value = null;
+    pushMediaDebug("SkinPresetBgm", "no-bgm-subpath", {
+      skinPresetId: appearance.skinPresetId,
+      enabled: appearance.skinPresetBgm.enabled,
+    });
     return;
   }
   try {
     const abs = await invoke<string>("workspaces_subpath", { subpath });
     bgmUrl.value = convertFileSrc(abs);
-  } catch {
+    pushMediaDebug("SkinPresetBgm", "bgm-url-loaded", {
+      subpath,
+      abs,
+      url: bgmUrl.value,
+    });
+  } catch (err) {
     bgmUrl.value = null;
+    pushMediaDebug("SkinPresetBgm", "bgm-url-failed", {
+      subpath,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -70,6 +84,13 @@ async function syncPlayback() {
   el.loop = true;
 
   if (!shouldPlay.value) {
+    pushMediaDebug("SkinPresetBgm", "skip-playback", {
+      enabled: appearance.skinPresetBgm.enabled,
+      colorScheme: appearance.colorScheme,
+      hasUrl: !!bgmUrl.value,
+      subpath: activeBgm.value?.workspaceSubpath ?? null,
+      toolAudioSuppressed: appearance.toolAudioSuppressed,
+    });
     el.pause();
     el.removeAttribute("src");
     appearance.setSkinBgmPlaying(false);
@@ -84,8 +105,13 @@ async function syncPlayback() {
   }
   try {
     await el.play();
-  } catch {
+    pushMediaDebug("SkinPresetBgm", "playing", { url });
+  } catch (err) {
     appearance.setSkinBgmPlaying(false);
+    pushMediaDebug("SkinPresetBgm", "play-failed", {
+      url,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

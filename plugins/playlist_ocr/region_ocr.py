@@ -27,16 +27,26 @@ _EXTRACT_MODULE_NAME = "toolbox_extract_playlist"
 
 def _candidate_extract_paths(workspace_root: str) -> list[Path]:
     """按优先级返回可能的 extract_playlist.py 位置。
-    1) 仓库内置 app/workspaces/music_crawl/playlist_ocr/（最可信，跟随工具箱发布）
-    2) 用户配置 workspace_root/playlist_ocr/（向后兼容）
-    3) 用户配置 workspace_root/music_crawl/playlist_ocr/
+    1) 安装目录 workspaces/music_crawl/playlist_ocr/（NSIS 安装布局）
+    2) 开发仓库 app/workspaces/music_crawl/playlist_ocr/
+    3) 用户配置 workspace_root/playlist_ocr/（向后兼容）
+    4) 用户配置 workspace_root/music_crawl/playlist_ocr/
     """
     candidates: list[Path] = []
 
-    # 当前脚本位于 plugins/playlist_ocr/region_ocr.py，上溯到仓库根
     here = Path(__file__).resolve()
+    install_root = here.parent.parent
+    if (install_root / "workspaces").is_dir():
+        candidates.append(
+            install_root
+            / "workspaces"
+            / "music_crawl"
+            / "playlist_ocr"
+            / "extract_playlist.py"
+        )
+
     toolbox_root = here.parent.parent.parent
-    repo_path = (
+    candidates.append(
         toolbox_root
         / "app"
         / "workspaces"
@@ -44,7 +54,6 @@ def _candidate_extract_paths(workspace_root: str) -> list[Path]:
         / "playlist_ocr"
         / "extract_playlist.py"
     )
-    candidates.append(repo_path)
 
     if workspace_root:
         ws = Path(workspace_root)

@@ -12,6 +12,7 @@
     "tauri": "tauri",
     "prepare:bundle": "powershell -ExecutionPolicy Bypass -File ./scripts/prepare-bundle.ps1",
     "prepare:bundle:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/prepare-bundle.ps1 -SkipIcons",
+    "ensure:bundle": "powershell -ExecutionPolicy Bypass -File ./scripts/ensure-bundle.ps1",
     "build:installer": "npm run prepare:bundle && npm run tauri build"
   },
   "dependencies": {

@@ -43,6 +43,10 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
   const batchDone = ref(0);
   const batchCurrentKey = ref("");
   const batchCurrentName = ref("");
+  /** OCR 引擎加载进度（由 Python `[OCR-PROGRESS]` 日志驱动） */
+  const engineLoadPercent = ref(0);
+  /** 最近一次 `[OCR-PROGRESS]` 文案，用于进度条标题 */
+  const engineLoadMessage = ref("");
   /** 批量扫描中刚完成一张图，供 UI 从 regions 缓存加载 OCR 框 */
   const lastRegionsReady = ref<{ name: string; path: string } | null>(null);
 
@@ -65,14 +69,18 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
   const batchTotal = computed(() => batchImages.value.length);
   const batchProgressPercent = computed(() => {
     if (!ocrBatchActive.value || batchTotal.value === 0) return 0;
-    if (batchPhase.value === "warming" && batchDone.value === 0) return 8;
+    if (engineLoadPercent.value > 0) {
+      return engineLoadPercent.value;
+    }
+    if (batchPhase.value === "warming" && batchDone.value === 0) return 0;
     if (batchPhase.value === "finalizing") return 100;
     return Math.min(100, Math.round((batchDone.value / batchTotal.value) * 100));
   });
   const batchStatusLabel = computed(() => {
     if (!ocrBatchActive.value) return "";
+    if (engineLoadMessage.value) return engineLoadMessage.value;
     if (batchPhase.value === "warming" && batchDone.value === 0) {
-      return "正在加载识别引擎，请稍候…";
+      return engineLoadMessage.value || "正在启动子进程…";
     }
     if (batchPhase.value === "finalizing") {
       return "正在汇总并写入歌单…";
@@ -130,6 +138,8 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     nameToKey.value = names;
     batchPhase.value = "warming";
     batchDone.value = 0;
+    engineLoadPercent.value = 0;
+    engineLoadMessage.value = "";
     lastRegionsReady.value = null;
     pushDebugLine(
       "歌单OCR",
@@ -174,6 +184,20 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
       handleCrawlLogLine(line);
       return;
     }
+    const progressMatch = line.match(/^\[OCR-PROGRESS\]\s*(\d+)\s+(.+)$/);
+    if (progressMatch) {
+      engineLoadPercent.value = Math.min(100, Number.parseInt(progressMatch[1], 10));
+      engineLoadMessage.value = progressMatch[2];
+      pushDebugLine("歌单OCR", "engine-progress", progressMatch[2], {
+        percent: engineLoadPercent.value,
+      });
+      if (batchPhase.value === "warming" && engineLoadPercent.value >= 18) {
+        batchPhase.value = "scanning";
+      }
+      if (engineLoadPercent.value >= 93) {
+        batchPhase.value = "finalizing";
+      }
+    }
     const doneMatch = line.match(/\[([^\]]+)\]\s*识别:/);
     if (doneMatch) {
       pushDebugLine("歌单OCR", "image-done", `单张完成：${doneMatch[1]}`, { raw: line });
@@ -184,7 +208,7 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
       batchPhase.value = "finalizing";
       pushDebugLine("歌单OCR", "phase-finalizing", line);
     }
-    if (batchPhase.value === "warming" && /Creating model|OCR 设备|PP-OCR/i.test(line)) {
+    if (batchPhase.value === "warming" && (engineLoadPercent.value >= 18 || /Creating model|PP-OCR/i.test(line))) {
       batchPhase.value = "scanning";
       pushDebugLine("歌单OCR", "phase-scanning", `引擎就绪：${line}`);
     }
@@ -275,6 +299,8 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     batchPhase.value = "idle";
     batchCurrentKey.value = "";
     batchCurrentName.value = "";
+    engineLoadPercent.value = 0;
+    engineLoadMessage.value = "";
   }
 
   function getImageStatus(path: string): ImageScanStatus | null {
@@ -391,6 +417,8 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     batchDone,
     batchCurrentKey,
     batchCurrentName,
+    engineLoadPercent,
+    engineLoadMessage,
     lastRegionsReady,
     ocrBatchActive,
     batchTotal,

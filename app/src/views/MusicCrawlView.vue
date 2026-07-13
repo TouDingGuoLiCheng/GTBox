@@ -60,7 +60,7 @@ function songKeyFromItem(item: { song: string; artist: string }) {
 
 const router = useRouter();
 const runStore = useMusicCrawlRunStore();
-const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, lastRegionsReady, crawlStatuses, crawlCurrentQuery, siteRateLimitHitAt, siteRateLimitMessage } =
+const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, batchPhase, engineLoadPercent, lastRegionsReady, crawlStatuses, crawlCurrentQuery, siteRateLimitHitAt, siteRateLimitMessage } =
   storeToRefs(runStore);
 
 const REGIONS_CACHE_DIR = "playlist_ocr/regions_cache";
@@ -122,6 +122,7 @@ const activeBoxId = ref("");
 const previewImageEl = ref<HTMLImageElement | null>(null);
 /** 大图滚动容器，用于把选中的 OCR 框滚进可视区域 */
 const previewViewportEl = ref<HTMLElement | null>(null);
+const ocrTerminalEl = ref<HTMLElement | null>(null);
 const previewDataUrl = ref("");
 const dropZoneActive = ref(false);
 const recognizing = ref(false);
@@ -151,6 +152,41 @@ const previewLoadingHint = computed(() => {
   if (previewLoading.value) return "正在加载图片…";
   return "";
 });
+
+function stripRunLogLine(raw: string) {
+  const m = raw.match(/^\[(stdout|stderr)\]\s*(.*)$/);
+  return m ? m[2] : raw;
+}
+
+const ocrTerminalText = computed(() => {
+  const lines = logs.value
+    .map(stripRunLogLine)
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return "";
+      const progressMatch = trimmed.match(/^\[OCR-PROGRESS\]\s*(\d+)\s+(.+)$/);
+      if (progressMatch) {
+        const percent = progressMatch[1].padStart(3, " ");
+        return `[${percent}%] ${progressMatch[2]}`;
+      }
+      return trimmed;
+    })
+    .filter(Boolean);
+  if (lines.length) return lines.join("\n");
+  if (running.value && ocrBatchActive.value) {
+    if (batchPhase.value === "warming") return "正在启动子进程，等待引擎加载输出…";
+    return "等待子进程输出…";
+  }
+  return "就绪。开始扫描后，引擎加载与识别过程会实时显示在此。";
+});
+
+function scrollOcrTerminalToBottom() {
+  void nextTick(() => {
+    const el = ocrTerminalEl.value;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  });
+}
 let dragRafId = 0;
 let pendingDragEvent: MouseEvent | null = null;
 
@@ -1288,6 +1324,10 @@ async function cancelRun() {
   await runStore.cancelRun();
 }
 
+watch(logs, () => {
+  if (stage.value === "ocr") scrollOcrTerminalToBottom();
+}, { deep: true });
+
 watch(selectedImage, (path, prev) => {
   if (prev) persistBoxesForImage(prev);
   restoreBoxesForImage(path);
@@ -1473,36 +1513,36 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <section class="col-span-4 min-h-0 rounded-xl border border-border bg-black/20 p-4">
-          <h3 class="mb-3 text-sm font-medium text-zinc-300">OCR 参数</h3>
-          <div class="mb-3 flex gap-2 text-xs">
-            <button
-              type="button"
-              class="rounded border border-border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="pickingDialog"
-              @click="pickFolder"
+        <section class="col-span-4 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-black/20 p-4">
+          <h3 class="mb-3 shrink-0 text-sm font-medium text-zinc-300">OCR 参数</h3>
+          <div class="shrink-0 space-y-3 text-sm">
+            <div class="flex gap-2 text-xs">
+              <button
+                type="button"
+                class="rounded border border-border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="pickingDialog"
+                @click="pickFolder"
+              >
+                {{ pickingDialog ? "选择中…" : "选择文件夹" }}
+              </button>
+              <button
+                type="button"
+                class="rounded border border-border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="pickingDialog"
+                @click="pickSingleImage"
+              >
+                选择图片（可多选）
+              </button>
+            </div>
+            <div
+              class="rounded border border-dashed px-2 py-2 text-xs transition"
+              :class="dropZoneActive ? 'border-accent bg-accent/10 text-accent' : 'border-border text-zinc-500'"
+              @dragover.prevent="dropZoneActive = true"
+              @dragleave.prevent="dropZoneActive = false"
+              @drop="onDropImage"
             >
-              {{ pickingDialog ? "选择中…" : "选择文件夹" }}
-            </button>
-            <button
-              type="button"
-              class="rounded border border-border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="pickingDialog"
-              @click="pickSingleImage"
-            >
-              选择图片（可多选）
-            </button>
-          </div>
-          <div
-            class="mb-3 rounded border border-dashed px-2 py-2 text-xs transition"
-            :class="dropZoneActive ? 'border-accent bg-accent/10 text-accent' : 'border-border text-zinc-500'"
-            @dragover.prevent="dropZoneActive = true"
-            @dragleave.prevent="dropZoneActive = false"
-            @drop="onDropImage"
-          >
-            拖拽单张图片到此处可直接载入
-          </div>
-          <div class="space-y-3 text-sm">
+              拖拽单张图片到此处可直接载入
+            </div>
             <p v-if="images.length" class="text-xs text-zinc-500">
               已载入 {{ images.length }} 张截图
               <span v-if="ocrInputSource === 'files'">（自选图片）</span>
@@ -1537,12 +1577,12 @@ onBeforeUnmount(() => {
               <div class="h-2 overflow-hidden rounded-full bg-zinc-800">
                 <div
                   class="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
-                  :class="{ 'animate-pulse': batchProgressPercent <= 8 }"
+                  :class="{ 'animate-pulse': batchPhase === 'warming' && engineLoadPercent === 0 }"
                   :style="{ width: `${batchProgressPercent}%` }"
                 />
               </div>
             </div>
-            <div class="flex gap-2 pt-2">
+            <div class="flex gap-2">
               <button type="button" class="rounded bg-accent px-3 py-1.5 text-black" :disabled="running" @click="runOcr">
                 {{ running && ocrBatchActive ? "正在扫描…" : running ? "运行中…" : "开始扫描" }}
               </button>
@@ -1550,7 +1590,15 @@ onBeforeUnmount(() => {
                 取消
               </button>
             </div>
-            <p v-if="ocrBatchActive" class="text-xs text-zinc-500">正在识别已载入的截图，左侧可查看每张进度</p>
+          </div>
+          <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-black/30">
+            <div class="shrink-0 border-b border-border px-3 py-1.5 text-xs text-zinc-500">
+              运行终端
+            </div>
+            <pre
+              ref="ocrTerminalEl"
+              class="ocr-terminal min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] leading-5 text-zinc-300"
+            >{{ ocrTerminalText }}</pre>
           </div>
         </section>
 
@@ -1681,67 +1729,69 @@ onBeforeUnmount(() => {
               · <span class="text-zinc-400">未下载 {{ pendingCount }}</span>
             </span>
           </div>
-          <div
-            ref="songListEl"
-            tabindex="0"
-            class="song-list relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded border border-border bg-black/40 p-2 pb-12 text-sm outline-none focus:ring-1 focus:ring-accent/40"
-            @keydown="onSongListKeyDown"
-            @click.self="clearSongSelection"
-          >
-            <p v-if="!songItems.length" class="px-2 py-6 text-center text-xs text-zinc-500">
-              暂无歌曲，点「批量编辑」粘贴歌单，或从「导入已有歌单」读入文件。
-            </p>
+          <div class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border bg-black/40">
             <div
-              v-for="item in songItems"
-              :key="item.id"
-              class="song-row group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition"
-              :class="[
-                selectedSongIds.has(item.id)
-                  ? 'bg-accent/20 ring-1 ring-accent/40'
-                  : 'hover:bg-white/5',
-                crawlCurrentQuery && songQueryKey(crawlCurrentQuery) === songQueryKey(`${item.song}-${item.artist}`)
-                  ? 'ring-1 ring-cyan-300/60'
-                  : '',
-              ]"
-              @click="onSongRowClick(item, $event)"
+              ref="songListEl"
+              tabindex="0"
+              class="song-list flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2 text-sm outline-none focus:ring-1 focus:ring-inset focus:ring-accent/40"
+              @keydown="onSongListKeyDown"
+              @click.self="clearSongSelection"
             >
-              <span class="min-w-0 flex-1 truncate">
-                <span class="text-zinc-200">{{ item.song }}</span>
-                <span v-if="item.artist" class="text-zinc-500"> - {{ item.artist }}</span>
-              </span>
-              <button
-                v-if="item.status === 'failed'"
-                type="button"
-                class="shrink-0 rounded p-0.5 text-red-400 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                :title="`失败：${item.note ?? ''}（点击重试这一首）`"
-                :disabled="running || !!retryingSongId"
-                @click.stop="retrySong(item)"
+              <p v-if="!songItems.length" class="px-2 py-6 text-center text-xs text-zinc-500">
+                暂无歌曲，点「批量编辑」粘贴歌单，或从「导入已有歌单」读入文件。
+              </p>
+              <div
+                v-for="item in songItems"
+                :key="item.id"
+                class="song-row group flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition"
+                :class="[
+                  selectedSongIds.has(item.id)
+                    ? 'bg-accent/20 ring-1 ring-accent/40'
+                    : 'hover:bg-white/5',
+                  crawlCurrentQuery && songQueryKey(crawlCurrentQuery) === songQueryKey(`${item.song}-${item.artist}`)
+                    ? 'ring-1 ring-cyan-300/60'
+                    : '',
+                ]"
+                @click="onSongRowClick(item, $event)"
               >
+                <span class="min-w-0 flex-1 truncate">
+                  <span class="text-zinc-200">{{ item.song }}</span>
+                  <span v-if="item.artist" class="text-zinc-500"> - {{ item.artist }}</span>
+                </span>
+                <button
+                  v-if="item.status === 'failed'"
+                  type="button"
+                  class="shrink-0 rounded p-0.5 text-red-400 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  :title="`失败：${item.note ?? ''}（点击重试这一首）`"
+                  :disabled="running || !!retryingSongId"
+                  @click.stop="retrySong(item)"
+                >
+                  <Icon
+                    :icon="retryingSongId === item.id ? 'mdi:loading' : 'mdi:close-circle'"
+                    :class="['h-5 w-5', retryingSongId === item.id ? 'animate-spin' : '']"
+                  />
+                </button>
                 <Icon
-                  :icon="retryingSongId === item.id ? 'mdi:loading' : 'mdi:close-circle'"
-                  :class="['h-5 w-5', retryingSongId === item.id ? 'animate-spin' : '']"
+                  v-else-if="item.status === 'success'"
+                  icon="mdi:check-circle"
+                  class="h-5 w-5 shrink-0 text-emerald-400"
+                  :title="item.note ? `成功：${item.note}` : '已下载'"
                 />
-              </button>
-              <Icon
-                v-else-if="item.status === 'success'"
-                icon="mdi:check-circle"
-                class="h-5 w-5 shrink-0 text-emerald-400"
-                :title="item.note ? `成功：${item.note}` : '已下载'"
-              />
-              <Icon
-                v-else
-                icon="mdi:circle-outline"
-                class="h-5 w-5 shrink-0 text-zinc-500"
-                :title="item.note || '未下载'"
-              />
+                <Icon
+                  v-else
+                  icon="mdi:circle-outline"
+                  class="h-5 w-5 shrink-0 text-zinc-500"
+                  :title="item.note || '未下载'"
+                />
+              </div>
             </div>
             <div
-              class="song-toolbar pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-2"
+              class="song-toolbar flex shrink-0 flex-wrap items-center gap-2 border-t border-border/80 bg-black/55 px-2 py-2"
               title="批量操作：单选 · Ctrl/⌘ 切换 · Shift 区间 · Delete 删除 · Ctrl/⌘+A 全选"
             >
               <button
                 type="button"
-                class="song-icon-btn pointer-events-auto"
+                class="song-icon-btn"
                 title="批量编辑（在弹窗里粘贴/修改一大段歌单，保存时按文本匹配保留状态）"
                 @click="openBulkEditor"
               >
@@ -1749,7 +1799,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="song-icon-btn pointer-events-auto"
+                class="song-icon-btn"
                 title="导入已有歌单（从 .txt / .csv 合并进来）"
                 @click="importPlaylistFile"
               >
@@ -1757,7 +1807,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="song-icon-btn pointer-events-auto relative"
+                class="song-icon-btn relative"
                 :title="selectedSongIds.size ? `删除选中（${selectedSongIds.size}）` : '删除选中（也可按 Delete）'"
                 :disabled="!selectedSongIds.size"
                 @click="removeSelectedSongs"
@@ -1772,7 +1822,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="song-icon-btn pointer-events-auto"
+                class="song-icon-btn"
                 title="全选（也可按 Ctrl/⌘+A）"
                 :disabled="!songItems.length"
                 @click="selectAllSongs"
@@ -1781,7 +1831,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="song-icon-btn pointer-events-auto"
+                class="song-icon-btn"
                 title="取消选中"
                 :disabled="!selectedSongIds.size"
                 @click="clearSongSelection"
@@ -2119,8 +2169,7 @@ button:disabled {
 }
 
 .song-list {
-  min-height: 320px;
-  max-height: calc(100vh - 320px);
+  min-height: 0;
 }
 
 .song-row {
@@ -2206,5 +2255,12 @@ button.song-icon-btn:disabled {
 .bulk-modal-leave-to {
   opacity: 0;
   transform: scale(0.96);
+}
+
+.ocr-terminal {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgb(9 9 11 / 0.55);
 }
 </style>

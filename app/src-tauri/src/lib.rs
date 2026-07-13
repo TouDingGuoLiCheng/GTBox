@@ -193,6 +193,138 @@ fn workspaces_root() -> PathBuf {
     data_root().join("workspaces")
 }
 
+fn default_python_path() -> String {
+    String::from(r".venv\Scripts\python.exe")
+}
+
+fn resolve_configured_python(settings: &AppSettings) -> PathBuf {
+    resolve_path(&settings.workspace_root, &settings.python_path)
+}
+
+fn normalize_settings(mut settings: AppSettings) -> AppSettings {
+    if !Path::new(&settings.workspace_root).is_dir() {
+        settings.workspace_root = default_workspace_root();
+    }
+
+    let python = resolve_configured_python(&settings);
+    let python_is_absolute = Path::new(&settings.python_path).is_absolute();
+    if python_is_absolute && !python.exists() {
+        settings.python_path = default_python_path();
+    } else if !python_is_absolute
+        && settings.python_path != "python"
+        && settings.python_path != default_python_path()
+        && !python.exists()
+    {
+        settings.python_path = default_python_path();
+    }
+
+    settings
+}
+
+fn persist_settings_if_needed(settings: &AppSettings) -> Result<(), String> {
+    let path = settings_path()?;
+    if !path.exists() {
+        return Ok(());
+    }
+    let text = fs::read_to_string(&path)
+        .map_err(|e| format!("读取设置失败: {} ({})", path.display(), e))?;
+    let stored = serde_json::from_str::<AppSettings>(&text)
+        .map_err(|e| format!("解析设置失败: {}", e))?;
+    if stored.workspace_root != settings.workspace_root
+        || stored.python_path != settings.python_path
+    {
+        save_settings(settings.clone())?;
+    }
+    Ok(())
+}
+
+fn log_install_layout() {
+    if let Some(root) = install_data_root() {
+        eprintln!(
+            "[GTBox] install root: {} | plugins: {} | workspaces: {}",
+            root.display(),
+            plugins_root().display(),
+            workspaces_root().display()
+        );
+    } else {
+        eprintln!(
+            "[GTBox] dev layout | plugins: {} | workspaces: {}",
+            plugins_root().display(),
+            workspaces_root().display()
+        );
+    }
+}
+
+fn verify_install_resources() {
+    if install_data_root().is_none() {
+        return;
+    }
+    let plugins = plugins_root();
+    if !plugins.exists() {
+        eprintln!("[GTBox] WARN: plugins directory missing at {}", plugins.display());
+    }
+    let ws = workspaces_root();
+    if !ws.exists() {
+        eprintln!("[GTBox] WARN: workspaces directory missing at {}", ws.display());
+        return;
+    }
+    for rel in [
+        "skin-presets/cloud.mp4",
+        "skin-presets/cloud-bgm.mp3",
+        "music_crawl/full_auto_download_2t58.py",
+    ] {
+        let p = ws.join(rel);
+        if !p.exists() {
+            eprintln!("[GTBox] WARN: missing bundled resource {}", p.display());
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallHealth {
+    mode: String,
+    ok: bool,
+    message: Option<String>,
+    plugins_ok: bool,
+    workspaces_ok: bool,
+}
+
+fn build_install_health() -> InstallHealth {
+    let install_root = install_data_root();
+    if install_root.is_none() {
+        return InstallHealth {
+            mode: "dev".into(),
+            ok: true,
+            message: None,
+            plugins_ok: true,
+            workspaces_ok: true,
+        };
+    }
+
+    let plugins_ok = plugins_root().is_dir();
+    let workspaces_ok = workspaces_root().is_dir();
+    let ok = plugins_ok && workspaces_ok;
+    let message = if ok {
+        None
+    } else {
+        let install_dir = install_root
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "GTBox 安装目录".into());
+        Some(format!(
+            "未找到完整的插件或工作区资源。\n\n请确认 {install_dir} 下存在 plugins 与 workspaces 文件夹，或使用安装包重新安装 GTBox。\n\n仅复制 gtbox.exe 无法正常运行业务工具与皮肤资源。"
+        ))
+    };
+
+    InstallHealth {
+        mode: "install".into(),
+        ok,
+        message,
+        plugins_ok,
+        workspaces_ok,
+    }
+}
+
 /// 插件脚本路径：优先 `app/workspaces/<entry>`（如 music_crawl/playlist_ocr/），否则相对用户工作区
 fn resolve_script_path(workspace_root: &str, entry: &str) -> PathBuf {
     let entry_path = Path::new(entry);
@@ -305,8 +437,9 @@ fn python_has_ocr_deps(interpreter: &Path) -> bool {
     if interpreter != Path::new("python") && !interpreter.exists() {
         return false;
     }
-    Command::new(interpreter)
-        .args(["-c", "import cv2; import paddleocr"])
+    let mut cmd = Command::new(interpreter);
+    configure_hidden_subprocess(&mut cmd);
+    cmd.args(["-c", "import cv2; import paddleocr"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -314,7 +447,17 @@ fn python_has_ocr_deps(interpreter: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn configure_hidden_subprocess(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
 fn apply_python_utf8_env(cmd: &mut Command) {
+    configure_hidden_subprocess(cmd);
     cmd.env("PYTHONIOENCODING", "utf-8")
         .env("PYTHONUTF8", "1");
 }
@@ -542,15 +685,29 @@ fn build_python_command(
 }
 
 #[tauri::command]
+fn check_install_health() -> InstallHealth {
+    build_install_health()
+}
+
+#[tauri::command]
+fn path_exists(path: String) -> bool {
+    Path::new(&path).exists()
+}
+
+#[tauri::command]
 fn get_settings() -> Result<AppSettings, String> {
     let path = settings_path()?;
-    if !path.exists() {
-        return Ok(AppSettings::default());
-    }
+    let settings = if !path.exists() {
+        AppSettings::default()
+    } else {
+        let text = fs::read_to_string(&path)
+            .map_err(|e| format!("读取设置失败: {} ({})", path.display(), e))?;
+        serde_json::from_str::<AppSettings>(&text).map_err(|e| format!("解析设置失败: {}", e))?
+    };
 
-    let text = fs::read_to_string(&path)
-        .map_err(|e| format!("读取设置失败: {} ({})", path.display(), e))?;
-    serde_json::from_str::<AppSettings>(&text).map_err(|e| format!("解析设置失败: {}", e))
+    let normalized = normalize_settings(settings);
+    persist_settings_if_needed(&normalized)?;
+    Ok(normalized)
 }
 
 #[tauri::command]
@@ -682,7 +839,9 @@ fn cancel_run(state: State<AppState>, run_id: String) -> Result<bool, String> {
         return Ok(false);
     };
 
-    let status = Command::new("taskkill")
+    let mut cmd = Command::new("taskkill");
+    configure_hidden_subprocess(&mut cmd);
+    let status = cmd
         .args(["/PID", &pid.to_string(), "/T", "/F"])
         .status()
         .map_err(|e| format!("终止进程失败: {}", e))?;
@@ -1297,6 +1456,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            log_install_layout();
+            verify_install_resources();
             translate::setup(app)?;
             Ok(())
         })
@@ -1326,6 +1487,8 @@ pub fn run() {
             pick_save_file,
             pick_open_file,
             compare_folders,
+            check_install_health,
+            path_exists,
             text_compare::text_compare_get_settings,
             text_compare::text_compare_save_settings,
             text_compare::write_text_file,

@@ -878,7 +878,73 @@ export const useAppearanceStore = defineStore("appearance", () => {
     ) {
       skinPresetId.value = "preset-clouds";
     }
+
+    let bgmHealed = false;
+    const preset = getSkinPreset(skinPresetId.value);
+    if (preset && colorScheme.value === "custom") {
+      try {
+        const abs = await invoke<string>("workspaces_subpath", {
+          subpath: preset.workspaceSubpath,
+        });
+        if (customSkin.value.backgroundImage !== abs) {
+          customSkin.value = { ...cloneSkin(customSkin.value), backgroundImage: abs };
+          skinDraft.value = cloneSkin(customSkin.value);
+          bgmHealed = true;
+          logAppearance("resolve-preset-background", {
+            presetId: preset.id,
+            background: briefPath(abs),
+          });
+        }
+        if (preset.bgmWorkspaceSubpath && bgmHealed) {
+          skinPresetBgm.value = { ...skinPresetBgm.value, enabled: true };
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logAppearance("resolve-preset-background-failed", {
+          presetId: preset.id,
+          error: errMsg,
+        });
+      }
+    } else {
+      const bg = customSkin.value.backgroundImage;
+      if (
+        bg &&
+        colorScheme.value === "custom" &&
+        !isWorkspaceSkinSubpath(bg) &&
+        !bg.startsWith("blob:") &&
+        !bg.startsWith("/") &&
+        !bg.includes("assets/")
+      ) {
+        try {
+          const exists = await invoke<boolean>("path_exists", { path: bg });
+          if (!exists) {
+            const sub = extractWorkspaceSubpathFromAbs(bg);
+            if (sub) {
+              const abs = await invoke<string>("workspaces_subpath", { subpath: sub });
+              customSkin.value = { ...cloneSkin(customSkin.value), backgroundImage: abs };
+              skinDraft.value = cloneSkin(customSkin.value);
+              logAppearance("heal-custom-background", {
+                sub,
+                background: briefPath(abs),
+              });
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    if (bgmHealed) requestSkinBgmSync();
     await refreshAppliedPreviewUrl();
+  }
+
+  function extractWorkspaceSubpathFromAbs(abs: string): string | null {
+    const norm = abs.replace(/\\/g, "/");
+    const m = norm.match(
+      /workspaces\/(skin-presets\/[^?#]+|skin-custom\/[^?#]+|creative\/[^?#]+)/i,
+    );
+    return m?.[1] ?? null;
   }
 
   async function applySkinPreset(id: SkinPresetId) {
@@ -904,6 +970,9 @@ export const useAppearanceStore = defineStore("appearance", () => {
     };
     skinDraft.value = cloneSkin(customSkin.value);
     skinPresetId.value = id;
+    if (preset.bgmWorkspaceSubpath) {
+      skinPresetBgm.value = { ...skinPresetBgm.value, enabled: true };
+    }
     if (creativeBackground.value.effect !== "none") {
       creativeBackground.value = { ...creativeBackground.value, effect: "none" };
     }
@@ -917,6 +986,8 @@ export const useAppearanceStore = defineStore("appearance", () => {
     logAppearance("apply-skin-preset", {
       presetId: id,
       background: briefPath(abs),
+      bgmEnabled: skinPresetBgm.value.enabled,
+      bgmSubpath: preset.bgmWorkspaceSubpath ?? null,
     });
   }
 

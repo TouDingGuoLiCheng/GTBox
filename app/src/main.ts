@@ -4,6 +4,7 @@ import { MotionPlugin } from "@vueuse/motion";
 import App from "./App.vue";
 import router from "./router";
 import { useAppearanceStore } from "./stores/appearance";
+import { checkInstallHealthOnStartup } from "./utils/installHealth";
 import "./assets/main.css";
 import "./styles/app-brand.css";
 import "./styles/desktop-peek.css";
@@ -21,7 +22,7 @@ app.use(router);
 app.use(MotionPlugin);
 
 const appearance = useAppearanceStore(pinia);
-appearance.init();
+void appearance.init().then(() => checkInstallHealthOnStartup());
 
 router.beforeEach((to) => {
   appearance.setToolAudioSuppressed(to.meta.suppressSkinBgm === true);
