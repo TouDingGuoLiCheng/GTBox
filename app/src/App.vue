@@ -37,6 +37,8 @@ const hideCreativeBySkinMedia = computed(
     appearance.colorScheme === "custom" &&
     !!appearance.customSkin.backgroundImage,
 );
+
+const shouldCacheRoute = (path: string) => path.startsWith("/tools/");
 </script>
 
 <template>
@@ -57,16 +59,37 @@ const hideCreativeBySkinMedia = computed(
     <main class="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
       <RouterView v-slot="{ Component, route }">
         <Transition v-if="appearance.uiPreferences.pageAnimation" name="page" mode="out-in">
-          <div :key="route.path" class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-            <component :is="Component" />
+          <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+            <KeepAlive max="32">
+              <component
+                :is="Component"
+                v-if="shouldCacheRoute(route.path)"
+                :key="route.fullPath"
+              />
+            </KeepAlive>
+            <component
+              :is="Component"
+              v-if="!shouldCacheRoute(route.path)"
+              :key="route.fullPath"
+            />
           </div>
         </Transition>
         <div
           v-else
-          :key="route.path"
           class="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <component :is="Component" />
+          <KeepAlive max="32">
+            <component
+              :is="Component"
+              v-if="shouldCacheRoute(route.path)"
+              :key="route.fullPath"
+            />
+          </KeepAlive>
+          <component
+            :is="Component"
+            v-if="!shouldCacheRoute(route.path)"
+            :key="route.fullPath"
+          />
         </div>
       </RouterView>
     </main>

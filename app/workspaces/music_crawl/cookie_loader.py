@@ -58,6 +58,32 @@ def save_cookies_json(cookies: list[dict[str, Any]], path: Path) -> None:
     path.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def session_cookies_to_list(session: requests.Session) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for c in session.cookies:
+        name = str(c.name or "").strip()
+        value = str(c.value or "").strip()
+        if not name:
+            continue
+        domain = str(c.domain or ".2t58.com").strip() or ".2t58.com"
+        path = str(c.path or "/").strip() or "/"
+        key = (name, domain)
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append({"name": name, "value": value, "domain": domain, "path": path})
+    return items
+
+
+def persist_session_cookies(
+    session: requests.Session, path: Path | None = None
+) -> Path:
+    out = path or Path(DEFAULT_COOKIE_FILE)
+    save_cookies_json(session_cookies_to_list(session), out)
+    return out
+
+
 def export_cookies_from_cdp(cdp_url: str = "http://127.0.0.1:9222") -> list[dict[str, Any]]:
     """Read cookies from your already-open Edge (not Playwright automation)."""
     from playwright.sync_api import sync_playwright

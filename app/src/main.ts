@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { MotionPlugin } from "@vueuse/motion";
+import { invoke } from "@tauri-apps/api/core";
 import App from "./App.vue";
 import router from "./router";
 import { useAppearanceStore } from "./stores/appearance";
@@ -22,6 +23,7 @@ app.use(router);
 app.use(MotionPlugin);
 
 const appearance = useAppearanceStore(pinia);
+void invoke("clear_runtime_cache").catch(() => undefined);
 void appearance.init().then(() => checkInstallHealthOnStartup());
 
 router.beforeEach((to) => {

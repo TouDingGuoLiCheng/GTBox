@@ -2,15 +2,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
-import yaml
 from PIL import Image, UnidentifiedImageError
 
 from .fixed import split_fixed_ranges
 from .smart import split_smart_ranges
 
 SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+
+
+def _load_flat_yaml(text: str) -> Dict[str, Any]:
+    """Parse flat `key: value` YAML without PyYAML (stdlib only)."""
+    data: Dict[str, Any] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key:
+            data[key] = value
+    return data
 
 
 @dataclass
@@ -27,7 +41,7 @@ class SplitConfig:
     def from_file(cls, path: Path) -> "SplitConfig":
         if not path.exists():
             return cls()
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = _load_flat_yaml(path.read_text(encoding="utf-8"))
         return cls(
             mode=str(data.get("mode", "auto")).lower(),
             output_dir=str(data.get("output_dir", "./output")),
@@ -156,8 +170,15 @@ def split_image_object(
     return len(ranges)
 
 
+def resolve_output_dir(config: SplitConfig, base_dir: Path) -> Path:
+    out = Path(config.output_dir)
+    if out.is_absolute():
+        return out.resolve()
+    return (base_dir / out).resolve()
+
+
 def process_batch(image_paths: List[Path], config: SplitConfig, base_dir: Path) -> Dict[str, int]:
-    output_dir = (base_dir / config.output_dir).resolve()
+    output_dir = resolve_output_dir(config, base_dir)
     processed = 0
     skipped = 0
     slices = 0

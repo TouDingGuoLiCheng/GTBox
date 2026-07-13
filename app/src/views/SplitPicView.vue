@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { pushDebugLine } from "../utils/mediaDebug";
 
 type MediaEntry = { name: string; path: string };
 
@@ -133,6 +134,19 @@ function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
+function isAbsolutePath(path: string): boolean {
+  const p = path.trim();
+  return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.startsWith("/");
+}
+
+async function resolveOutputRoot(): Promise<string> {
+  const raw = form.outputDir.trim() || "output";
+  if (isAbsolutePath(raw)) return raw;
+  return invoke<string>("workspaces_subpath", {
+    subpath: `split_pic/${raw}`.replace(/\\/g, "/"),
+  });
+}
+
 async function refreshSourceList() {
   sourceImages.value = [];
   selectedSource.value = "";
@@ -158,14 +172,15 @@ async function refreshSourceList() {
 }
 
 async function resolveOutputDirForStem(stem: string): Promise<string | null> {
-  const outRoot = await invoke<string>("workspaces_subpath", {
-    subpath: `split_pic/${form.outputDir}`.replace(/\\/g, "/"),
-  });
+  const outRoot = await resolveOutputRoot();
   try {
     const dirs = await invoke<string[]>("list_child_dirs", { path: outRoot });
     const match =
       dirs.find((d) => d === stem) ?? dirs.find((d) => d.startsWith(`${stem}_`));
-    if (match) return `${outRoot}\\${match}`;
+    if (match) {
+      const sep = outRoot.includes("/") && !outRoot.includes("\\") ? "/" : "\\";
+      return `${outRoot.replace(/[\\/]+$/, "")}${sep}${match}`;
+    }
   } catch {
     /* ignore */
   }
@@ -302,6 +317,19 @@ async function pickImages() {
     selectedPart.value = "";
     partPreviewUrl.value = "";
     resultMessage.value = "";
+  } finally {
+    pickingDialog.value = false;
+  }
+}
+
+async function pickOutputDir() {
+  if (pickingDialog.value) return;
+  pickingDialog.value = true;
+  try {
+    const path = await invoke<string | null>("pick_folder");
+    if (!path) return;
+    form.outputDir = path;
+    pushDebugLine("长截图分割", "pick-output-dir", `输出目录：${path}`);
   } finally {
     pickingDialog.value = false;
   }
@@ -703,7 +731,18 @@ onBeforeUnmount(() => {
           </label>
           <label class="block">
             <span class="mb-1 block text-xs text-zinc-500">输出目录</span>
-            <input v-model="form.outputDir" type="text" class="param-input" />
+            <button
+              type="button"
+              class="toolbar-btn flex w-full items-center justify-center gap-1.5 !px-2 text-xs"
+              :disabled="pickingDialog"
+              :title="form.outputDir"
+              @click="pickOutputDir"
+            >
+              <Icon icon="mdi:folder-outline" class="shrink-0 text-base" />
+              <span class="min-w-0 truncate">
+                {{ isAbsolutePath(form.outputDir) ? basename(form.outputDir) : form.outputDir || "选择输出文件夹" }}
+              </span>
+            </button>
           </label>
           <fieldset
             class="rounded-lg border border-border/80 p-2.5 transition"

@@ -28,7 +28,7 @@
     },
     {
       "name": "outputDir",
-      "label": "输出目录（相对 split_pic，默认 output）",
+      "label": "输出目录（绝对路径，或相对 split_pic）",
       "type": "string",
       "default": "output",
       "flag": "--output-dir"

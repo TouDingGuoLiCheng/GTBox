@@ -370,6 +370,16 @@ fn resolve_python_interpreter(
                 if local.exists() {
                     return local;
                 }
+                // 打包/debug 资源目录不含 .venv：回退到源码侧 app/workspaces/<tool>/.venv
+                if let Some(name) = cwd.file_name() {
+                    let source_venv = dev_app_root()
+                        .join("workspaces")
+                        .join(name)
+                        .join(r".venv\Scripts\python.exe");
+                    if source_venv.exists() {
+                        return source_venv;
+                    }
+                }
             }
             // 2) 用户设置中的 workspace_root/.venv
             let candidate = Path::new(&settings.workspace_root).join(".venv\\Scripts\\python.exe");
@@ -864,6 +874,29 @@ fn write_workspace_file(relative_path: String, content: String) -> Result<(), St
             .map_err(|e| format!("创建目录失败: {} ({})", parent.display(), e))?;
     }
     fs::write(&path, content).map_err(|e| format!("写入文件失败: {} ({})", path.display(), e))
+}
+
+#[tauri::command]
+fn clear_runtime_cache() -> Result<(), String> {
+    let settings = get_settings()?;
+    let workspace_root = PathBuf::from(&settings.workspace_root);
+    let cache_targets = [
+        workspace_root.join("songs_state.json"),
+        workspace_root.join("playlist_ocr").join("regions_cache"),
+        workspaces_root().join("split_pic").join("temp").join("picked_inputs.txt"),
+    ];
+    for target in cache_targets {
+        if target.is_dir() {
+            fs::remove_dir_all(&target)
+                .map_err(|e| format!("清理缓存目录失败: {} ({})", target.display(), e))?;
+            continue;
+        }
+        if target.is_file() {
+            fs::remove_file(&target)
+                .map_err(|e| format!("清理缓存文件失败: {} ({})", target.display(), e))?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1467,6 +1500,7 @@ pub fn run() {
             list_plugins,
             run_tool,
             cancel_run,
+            clear_runtime_cache,
             read_workspace_file,
             write_workspace_file,
             read_text_file,

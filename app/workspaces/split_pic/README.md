@@ -12,8 +12,17 @@
 
 ## 安装
 
+工具箱内运行时会自动检测并安装 `Pillow` / `numpy`（读 `requirements.txt`）。手动环境：
+
 ```bash
-python -m pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+网页模式额外需要 Flask：
+
+```bash
+.\.venv\Scripts\python.exe -m pip install -r requirements-web.txt
 ```
 
 ## 使用方式

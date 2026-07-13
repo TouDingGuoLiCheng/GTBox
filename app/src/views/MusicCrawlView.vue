@@ -60,7 +60,7 @@ function songKeyFromItem(item: { song: string; artist: string }) {
 
 const router = useRouter();
 const runStore = useMusicCrawlRunStore();
-const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, batchPhase, engineLoadPercent, lastRegionsReady, crawlStatuses, crawlCurrentQuery, siteRateLimitHitAt, siteRateLimitMessage } =
+const { running, logs, ocrBatchActive, batchProgressPercent, batchStatusLabel, batchPhase, engineLoadPercent, lastRegionsReady, crawlStatuses, crawlCurrentQuery, siteRateLimitHitAt, siteRateLimitMessage, humanVerifyHitAt, humanVerifyMessage } =
   storeToRefs(runStore);
 
 const REGIONS_CACHE_DIR = "playlist_ocr/regions_cache";
@@ -98,10 +98,10 @@ const songListEl = ref<HTMLElement | null>(null);
 const retryingSongId = ref("");
 /** 批量编辑对话框开关 */
 const showBulkEditor = ref(false);
-/** Cookie 更新对话框（站点限制 / 手动入口） */
+/** Cookie 更新对话框（站点限制 / 人机验证 / 手动入口） */
 const showCookieDialog = ref(false);
-/** 对话框是站点限制自动打开 (`auto`) 还是用户手动打开 (`manual`)，文案略有不同。 */
-const cookieDialogTrigger = ref<"auto" | "manual">("manual");
+/** 对话框触发来源，文案略有不同。 */
+const cookieDialogTrigger = ref<"auto" | "manual" | "human-verify">("manual");
 /** 对话框 textarea 绑定的 Cookie 字符串。 */
 const cookieDialogText = ref("");
 /** 对话框内的临时提示（保存成功/失败等） */
@@ -1095,7 +1095,7 @@ function applyBulkEditor() {
 }
 
 // ----- Cookie 更新对话框 -----
-function openCookieDialog(trigger: "auto" | "manual" = "manual") {
+function openCookieDialog(trigger: "auto" | "manual" | "human-verify" = "manual") {
   cookieDialogTrigger.value = trigger;
   cookieDialogText.value = "";
   cookieDialogHint.value = "";
@@ -1104,13 +1104,30 @@ function openCookieDialog(trigger: "auto" | "manual" = "manual") {
 function closeCookieDialog() {
   if (cookieDialogSaving.value) return;
   showCookieDialog.value = false;
+  runStore.ackSiteRateLimit();
+  runStore.ackHumanVerify();
 }
 async function openExternalSite() {
   try {
     await openUrl("https://www.2t58.com/");
+    pushDebugLine("音乐爬取", "open-2t58", "已打开 https://www.2t58.com/");
   } catch (err) {
     cookieDialogHint.value = `打开浏览器失败：${err instanceof Error ? err.message : String(err)}`;
   }
+}
+function cookieDialogTitle(): string {
+  if (cookieDialogTrigger.value === "auto") return "2t58 下载受限，需要更新 Cookie";
+  if (cookieDialogTrigger.value === "human-verify") return "2t58 人机验证失败，需要手动完成";
+  return "更新 2t58 Cookie";
+}
+function cookieDialogBanner(): string {
+  if (cookieDialogTrigger.value === "human-verify") {
+    return humanVerifyMessage.value || "自动过人机验证失败，请在浏览器完成验证后更新 Cookie。";
+  }
+  if (cookieDialogTrigger.value === "auto") {
+    return siteRateLimitMessage.value;
+  }
+  return "";
 }
 /** 内部：保存当前 textarea 的 cookie。成功返回解析到的条数，失败抛错。 */
 async function saveCookieFromDialog(): Promise<number> {
@@ -1131,6 +1148,7 @@ async function onlySaveCookie() {
     cookieDialogHint.value = `已保存 ${n} 条 Cookie 到 2t58_cookies.json`;
     showInfoMessage(`Cookie 已更新（${n} 条）`);
     runStore.ackSiteRateLimit();
+    runStore.ackHumanVerify();
     setTimeout(() => {
       showCookieDialog.value = false;
     }, 600);
@@ -1143,6 +1161,7 @@ async function saveCookieAndRetry() {
     const n = await saveCookieFromDialog();
     cookieDialogHint.value = `已保存 ${n} 条 Cookie，正在重试失败项…`;
     runStore.ackSiteRateLimit();
+    runStore.ackHumanVerify();
     showCookieDialog.value = false;
     if (runnableCount.value === 0) {
       showInfoMessage(`Cookie 已更新（${n} 条），但目前没有失败/未爬取项可重试`);
@@ -1411,6 +1430,13 @@ watch(
 watch(siteRateLimitHitAt, (hitAt) => {
   if (!hitAt) return;
   openCookieDialog("auto");
+});
+
+/** 自动过人机验证失败：弹窗 + 自动打开网页，方便手动完成验证。 */
+watch(humanVerifyHitAt, (hitAt) => {
+  if (!hitAt) return;
+  openCookieDialog("human-verify");
+  void openExternalSite();
 });
 
 onMounted(async () => {
@@ -1980,10 +2006,10 @@ onBeforeUnmount(() => {
           <div class="mb-3 flex items-center justify-between">
             <h3 class="flex items-center gap-2 text-base font-semibold text-zinc-100">
               <Icon
-                :icon="cookieDialogTrigger === 'auto' ? 'mdi:alert-circle-outline' : 'mdi:cookie-edit-outline'"
-                :class="cookieDialogTrigger === 'auto' ? 'h-5 w-5 text-amber-400' : 'h-5 w-5 text-accent'"
+                :icon="cookieDialogTrigger === 'manual' ? 'mdi:cookie-edit-outline' : 'mdi:alert-circle-outline'"
+                :class="cookieDialogTrigger === 'manual' ? 'h-5 w-5 text-accent' : 'h-5 w-5 text-amber-400'"
               />
-              {{ cookieDialogTrigger === 'auto' ? '2t58 下载受限，需要更新 Cookie' : '更新 2t58 Cookie' }}
+              {{ cookieDialogTitle() }}
             </h3>
             <button
               type="button"
@@ -1995,8 +2021,11 @@ onBeforeUnmount(() => {
               <Icon icon="mdi:close" class="h-5 w-5" />
             </button>
           </div>
-          <p v-if="cookieDialogTrigger === 'auto' && siteRateLimitMessage" class="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100">
-            {{ siteRateLimitMessage }}
+          <p
+            v-if="cookieDialogBanner()"
+            class="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100"
+          >
+            {{ cookieDialogBanner() }}
           </p>
           <ol class="mb-3 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-zinc-300">
             <li>
@@ -2005,7 +2034,12 @@ onBeforeUnmount(() => {
                 <Icon icon="mdi:open-in-new" class="h-3.5 w-3.5" />
                 打开 2t58.com
               </button>
-              在浏览器完成口令验证（必要时按提示输入数字 / 滑动等）。
+              <template v-if="cookieDialogTrigger === 'human-verify'">
+                在浏览器完成人机验证（勾选 / 滑动 / 拼图等，以页面提示为准）。
+              </template>
+              <template v-else>
+                在浏览器完成口令验证（必要时按提示输入数字 / 滑动等）。
+              </template>
             </li>
             <li>
               按 <kbd class="rounded bg-black/40 px-1.5">F12</kbd> 打开开发者工具 → <span class="text-zinc-100">Network</span> 选项卡 → 刷新页面 → 任选一条 2t58 请求 → 在 <span class="text-zinc-100">Request Headers</span> 中复制整行 <code class="rounded bg-black/40 px-1">Cookie:</code> 之后的内容。

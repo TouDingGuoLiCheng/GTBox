@@ -93,6 +93,115 @@ def get_with_fallback(
     return None, last_error
 
 
+def is_human_verify_page(html: str) -> bool:
+    if not html:
+        return False
+    if "安全人机验证" in html or "安全验证" in html:
+        return True
+    return "human_check" in html and "csrf_token" in html
+
+
+def looks_like_unknown_verify_page(html: str) -> bool:
+    """站点换了验证形态时：无歌曲链接 + 明显验证文案 → 当作需人工处理。"""
+    if not html or "/song/" in html:
+        return False
+    markers = (
+        "人机验证",
+        "安全验证",
+        "请完成验证",
+        "滑动验证",
+        "captcha",
+        "cf-challenge",
+        "challenge-platform",
+        "turnstile",
+        "recaptcha",
+        "hcaptcha",
+    )
+    low = html.lower()
+    return any(m.lower() in low if m.isascii() else m in html for m in markers)
+
+
+def _extract_csrf_token(html: str) -> str:
+    patterns = [
+        r"""name=["']csrf_token["'][^>]*value=["']([^"']+)["']""",
+        r"""value=["']([^"']+)["'][^>]*name=["']csrf_token["']""",
+    ]
+    for pat in patterns:
+        m = re.search(pat, html, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
+def pass_human_verify(
+    session: requests.Session,
+    page_url: str,
+    html: str,
+    timeout: int = 15,
+) -> tuple[bool, str]:
+    """Submit the site's checkbox human-check form. Valid ~1 hour after success."""
+    token = _extract_csrf_token(html)
+    if not token:
+        return False, "verify_page_missing_csrf"
+    headers = {
+        "Referer": page_url,
+        "Origin": BASE_URL,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    data = {"csrf_token": token, "human_check": "on"}
+    try:
+        resp = session.post(
+            page_url, data=data, headers=headers, timeout=timeout, allow_redirects=True
+        )
+    except requests.RequestException as ex:
+        return False, f"verify_post_error:{ex}"
+    if resp.status_code != 200:
+        return False, f"verify_post_status_{resp.status_code}"
+    if is_human_verify_page(resp.text):
+        return False, "verify_post_still_blocked"
+    try:
+        from cookie_loader import persist_session_cookies
+
+        persist_session_cookies(session)
+    except OSError:
+        pass
+    return True, ""
+
+
+def get_page(
+    session: requests.Session,
+    url: str,
+    timeout: int = 15,
+    extra_headers: dict[str, str] | None = None,
+) -> tuple[requests.Response | None, str]:
+    """GET with http/https fallback; auto-pass 2t58 human-check once if hit."""
+    resp, err = get_with_fallback(
+        session, url, timeout=timeout, extra_headers=extra_headers
+    )
+    if resp is None:
+        return None, err
+    if is_human_verify_page(resp.text):
+        print("[info] 检测到 2t58 人机验证页，尝试自动勾选通过…")
+        ok, note = pass_human_verify(session, str(resp.url), resp.text, timeout=timeout)
+        if not ok:
+            return None, f"need_human_verify|{note}"
+
+        resp2, err2 = get_with_fallback(
+            session, url, timeout=timeout, extra_headers=extra_headers
+        )
+        if resp2 is None:
+            return None, err2 or "verify_passed_but_retry_failed"
+        if is_human_verify_page(resp2.text) or looks_like_unknown_verify_page(resp2.text):
+            return None, "need_human_verify|retry_still_verify_page"
+        print("[info] 人机验证已自动通过")
+        return resp2, ""
+
+    # 站点换成滑动/拼图等未知形态时，不瞎 POST，直接走人工后门。
+    if looks_like_unknown_verify_page(resp.text):
+        return None, "need_human_verify|unknown_verify_page"
+    return resp, ""
+
+
 def parse_input(path: Path) -> list[QueryItem]:
     items: list[QueryItem] = []
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -292,8 +401,9 @@ def fetch_media_url_by_api(
 def crawl_one(session: requests.Session, query: QueryItem, delay: float) -> CrawlResult:
     q = query.keyword
     s_url = search_url(q)
-    r, search_err = get_with_fallback(session, s_url, timeout=15)
+    r, search_err = get_page(session, s_url, timeout=15)
     if r is None:
+        status = "need_human_verify" if "need_human_verify" in (search_err or "") else "search_error"
         return CrawlResult(
             query=q,
             song=query.song,
@@ -302,13 +412,31 @@ def crawl_one(session: requests.Session, query: QueryItem, delay: float) -> Craw
             matched_artist="",
             song_page="",
             media_url="",
-            status="search_error",
+            status=status,
             note=search_err,
+        )
+
+    if is_human_verify_page(r.text) or looks_like_unknown_verify_page(r.text):
+        return CrawlResult(
+            query=q,
+            song=query.song,
+            artist=query.artist,
+            matched_title="",
+            matched_artist="",
+            song_page="",
+            media_url="",
+            status="need_human_verify",
+            note="search_hit_human_verify_page",
         )
 
     candidates = parse_search_results(r.text, s_url)
     best = pick_best_candidate(query, candidates)
     if not best:
+        note = "search_page_parsed_but_no_song_link"
+        status = "no_result"
+        if looks_like_unknown_verify_page(r.text):
+            status = "need_human_verify"
+            note = "unknown_verify_page_no_song_link"
         return CrawlResult(
             query=q,
             song=query.song,
@@ -317,15 +445,16 @@ def crawl_one(session: requests.Session, query: QueryItem, delay: float) -> Craw
             matched_artist="",
             song_page="",
             media_url="",
-            status="no_result",
-            note="search_page_parsed_but_no_song_link",
+            status=status,
+            note=note,
         )
 
     time.sleep(delay)
     page_url = best["song_page"]
     page_headers = {"Referer": s_url}
-    p, page_err = get_with_fallback(session, page_url, timeout=15, extra_headers=page_headers)
+    p, page_err = get_page(session, page_url, timeout=15, extra_headers=page_headers)
     if p is None:
+        status = "need_human_verify" if "need_human_verify" in (page_err or "") else "song_page_error"
         return CrawlResult(
             query=q,
             song=query.song,
@@ -334,7 +463,7 @@ def crawl_one(session: requests.Session, query: QueryItem, delay: float) -> Craw
             matched_artist=best.get("artist", ""),
             song_page=page_url,
             media_url="",
-            status="song_page_error",
+            status=status,
             note=page_err,
         )
 

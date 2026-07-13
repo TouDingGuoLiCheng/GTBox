@@ -1,12 +1,57 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
-from splitter.core import SplitConfig, collect_images, process_batch
-
 PICKED_INPUTS_REL = "temp/picked_inputs.txt"
+_BASE_DIR = Path(__file__).resolve().parent
+_REQUIRED_MODULES = ("PIL", "numpy")
+
+
+def ensure_runtime_deps() -> None:
+    """Install CLI deps into the current interpreter if missing (packaging-safe)."""
+    missing = []
+    for name in _REQUIRED_MODULES:
+        try:
+            __import__(name)
+        except ImportError:
+            missing.append(name)
+    if not missing:
+        return
+
+    req = _BASE_DIR / "requirements.txt"
+    print(f"缺少依赖 {', '.join(missing)}，正在安装: {req}", flush=True)
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-r", str(req)],
+            cwd=str(_BASE_DIR),
+        )
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(
+            f"依赖安装失败（缺少 {', '.join(missing)}）。"
+            f"请手动执行: {sys.executable} -m pip install -r \"{req}\""
+        ) from exc
+
+    for name in _REQUIRED_MODULES:
+        try:
+            __import__(name)
+        except ImportError as exc:
+            raise SystemExit(
+                f"仍缺少模块 {name}。请手动执行: "
+                f"{sys.executable} -m pip install -r \"{req}\""
+            ) from exc
+
+
+ensure_runtime_deps()
+
+from splitter.core import (  # noqa: E402
+    SplitConfig,
+    collect_images,
+    process_batch,
+    resolve_output_dir,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -89,7 +134,7 @@ def resolve_image_paths(args: argparse.Namespace, base_dir: Path) -> list[Path]:
 
 def main() -> int:
     args = build_parser().parse_args()
-    base_dir = Path(__file__).resolve().parent
+    base_dir = _BASE_DIR
     config = SplitConfig.from_file(base_dir / "config.yaml")
     config = apply_overrides(config, args)
 
@@ -104,7 +149,7 @@ def main() -> int:
         f"跳过 {result['skipped']} 张, "
         f"输出切片 {result['slices']} 张。"
     )
-    out = (base_dir / config.output_dir).resolve()
+    out = resolve_output_dir(config, base_dir)
     print(f"输出目录: {out}")
     return 0
 

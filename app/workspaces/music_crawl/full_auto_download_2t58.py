@@ -131,11 +131,11 @@ def collect_download_targets(
 
     total = len(song_list)
     for idx, q in enumerate(song_list, start=1):
-        print(f"[{idx}/{total}] crawl: {q.keyword}")
+        print(f"[{idx}/{total}] crawl: {q.keyword}", flush=True)
         crawl_result = crawl_one(session, q, delay=delay)
         if not crawl_result.song_page:
             reason = crawl_result.note or crawl_result.status or "unknown"
-            print(f"  -> crawl失败: {crawl_result.status} | {reason}")
+            print(f"  -> crawl失败: {crawl_result.status} | {reason}", flush=True)
             result_rows.append(
                 QuarkItem(
                     query=q.keyword,
@@ -151,6 +151,36 @@ def collect_download_targets(
                     note=reason,
                 )
             )
+            # 自动过人机验证失败：发 UI 信号、尝试打开浏览器，并跳过剩余搜索。
+            if crawl_result.status == "need_human_verify":
+                print(
+                    f"[human-verify] 自动过人机验证失败（{reason}）。"
+                    "请在浏览器完成验证后，更新 Cookie 再重试。",
+                    flush=True,
+                )
+                try:
+                    import webbrowser
+
+                    webbrowser.open("https://www.2t58.com/")
+                except Exception as ex:  # noqa: BLE001
+                    print(f"[human-verify] 打开浏览器失败: {ex}", flush=True)
+                for q2 in song_list[idx:]:
+                    result_rows.append(
+                        QuarkItem(
+                            query=q2.keyword,
+                            song=q2.song,
+                            artist=q2.artist,
+                            song_page="",
+                            song_id="",
+                            quark_name="",
+                            quark_url="",
+                            quark_pwd="",
+                            web_download_url="",
+                            status="skipped_human_verify",
+                            note="skipped_after_need_human_verify",
+                        )
+                    )
+                break
             continue
 
         print(f"  -> crawl成功: 歌曲页 {crawl_result.song_page}")
@@ -1177,17 +1207,18 @@ def main() -> None:
         print("[info] 已启用系统代理 (trust_env=True)")
     else:
         print("[info] 未使用系统代理 (避免代理IP被2t58限流)")
+    # 搜索/歌曲页也会触发人机验证；先挂 Cookie，命中验证页时由 get_page 自动勾选并通过。
+    cookie_path = Path(args.cookies_file) if args.cookies_file else None
+    cookie_msg = attach_2t58_cookies(
+        session,
+        cookies_file=cookie_path,
+        use_edge_cookies=args.use_edge_cookies,
+        user_data_dir=Path(args.user_data_dir),
+        channel=args.channel,
+    )
+    print(f"[info] {cookie_msg}")
     if mode == "B" and args.b_method == "http":
         print("[info] 模式B使用HTTP直连（携带浏览器 Cookie，走 MP3 320k 按钮）")
-        cookie_path = Path(args.cookies_file) if args.cookies_file else None
-        cookie_msg = attach_2t58_cookies(
-            session,
-            cookies_file=cookie_path,
-            use_edge_cookies=args.use_edge_cookies,
-            user_data_dir=Path(args.user_data_dir),
-            channel=args.channel,
-        )
-        print(f"[info] {cookie_msg}")
     rows = collect_download_targets(songs, delay=args.delay, mode=mode, session=session)
     output_path = Path(args.output)
 

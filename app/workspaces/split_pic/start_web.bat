@@ -19,7 +19,7 @@ for /f "tokens=5" %%p in ('netstat -ano ^| findstr "127.0.0.1:5050" ^| findstr "
 )
 
 echo 正在安装/检查依赖...
-"%PYTHON%" -m pip install -r "%ROOT%requirements.txt"
+"%PYTHON%" -m pip install -r "%ROOT%requirements-web.txt"
 if errorlevel 1 (
     echo 依赖安装失败。
     pause

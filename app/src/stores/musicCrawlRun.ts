@@ -59,6 +59,9 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
    * 用 number（时间戳）便于触发多次提示 / watch 同值不重复触发。 */
   const siteRateLimitHitAt = ref(0);
   const siteRateLimitMessage = ref("");
+  /** 阶段B：自动过人机验证失败时由 [human-verify] 日志驱动，UI 弹窗并打开网页。 */
+  const humanVerifyHitAt = ref(0);
+  const humanVerifyMessage = ref("");
 
   let listenersAttached = false;
   const unlisteners: UnlistenFn[] = [];
@@ -236,6 +239,14 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
       pushDebugLine("音乐爬取", "site-rate-limit", siteLimitMatch[1].trim());
       return;
     }
+    // 人机验证：自动勾选失败 / 站点换了验证形态时，弹窗并打开网页让用户手动过。
+    const humanVerifyMatch = line.match(/^\s*\[human-verify\]\s*(.+)$/);
+    if (humanVerifyMatch) {
+      humanVerifyMessage.value = humanVerifyMatch[1].trim();
+      humanVerifyHitAt.value = Date.now();
+      pushDebugLine("音乐爬取", "human-verify", humanVerifyMatch[1].trim());
+      return;
+    }
     const stageMatch = line.match(/^\s*\[\d+\/\d+\]\s*(?:quark|website|http|searching)\s*:\s*(.+?)\s*(?:->.*)?$/);
     if (stageMatch) {
       crawlCurrentQuery.value = stageMatch[1].trim();
@@ -279,10 +290,14 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     crawlStatuses.value = {};
     crawlCurrentQuery.value = "";
     siteRateLimitMessage.value = "";
+    humanVerifyMessage.value = "";
   }
   /** UI 处理完限制提示后，清掉触发时间戳，等下一次再触发时 watch 才会再开对话框。 */
   function ackSiteRateLimit() {
     siteRateLimitHitAt.value = 0;
+  }
+  function ackHumanVerify() {
+    humanVerifyHitAt.value = 0;
   }
 
   function finishBatch(success: boolean) {
@@ -428,6 +443,8 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     crawlCurrentQuery,
     siteRateLimitHitAt,
     siteRateLimitMessage,
+    humanVerifyHitAt,
+    humanVerifyMessage,
     toImageCacheKey: imageCacheKey,
     appendLog,
     resetBatch,
@@ -438,5 +455,6 @@ export const useMusicCrawlRunStore = defineStore("musicCrawlRun", () => {
     cancelRun,
     resetCrawl,
     ackSiteRateLimit,
+    ackHumanVerify,
   };
 });
