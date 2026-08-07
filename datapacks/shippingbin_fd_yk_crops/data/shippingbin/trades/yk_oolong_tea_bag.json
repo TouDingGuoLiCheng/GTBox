@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 1,
+    "ingredient": {
+      "item": "youkaishomecoming:oolong_tea_bag"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_gold",
+    "count": 6
+  }
+}

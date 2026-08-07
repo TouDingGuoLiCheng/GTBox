@@ -11,6 +11,15 @@ export const mockTools: ToolItem[] = [
     customRoute: "/tools/music-crawl",
   },
   {
+    id: "mc_mod_updater",
+    name: "MineCraft模组更新器",
+    description: "扫描本地 mods，检查并更新可用新版本",
+    category: "游戏",
+    icon: "mdi:cube-outline",
+    tags: ["Minecraft", "mod"],
+    customRoute: "/tools/mc-mod-updater",
+  },
+  {
     id: "batch_crawl",
     name: "批量爬取",
     description: "按 songs.txt 批量搜索与爬取",

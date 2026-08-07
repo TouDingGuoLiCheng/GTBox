@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 24,
+    "ingredient": {
+      "item": "youkaishomecoming:red_grape"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_emerald",
+    "count": 1
+  }
+}

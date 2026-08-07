@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 64,
+    "ingredient": {
+      "item": "farmersdelight:rotten_tomato"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_copper",
+    "count": 1
+  }
+}

@@ -16,6 +16,12 @@ const router = createRouter({
       meta: { title: "一键爬取音乐" },
     },
     {
+      path: "/tools/mc-mod-updater",
+      name: "mc-mod-updater",
+      component: () => import("../views/McModUpdaterView.vue"),
+      meta: { title: "MineCraft模组更新器" },
+    },
+    {
       path: "/tools/batch-rename",
       name: "batch-rename",
       component: () => import("../views/BatchRenameView.vue"),

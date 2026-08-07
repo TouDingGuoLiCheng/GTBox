@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 24,
+    "ingredient": {
+      "item": "youkaishomecoming:stripped_mandrake_root"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_emerald",
+    "count": 1
+  }
+}

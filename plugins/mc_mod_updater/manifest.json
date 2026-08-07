@@ -1,0 +1,95 @@
+{
+  "id": "mc_mod_updater",
+  "name": "MineCraft模组更新器",
+  "description": "扫描本地 mods，检查并更新可用新版本",
+  "category": "游戏",
+  "icon": "mdi:cube-outline",
+  "tags": ["Minecraft", "mod", "更新"],
+  "customRoute": "/tools/mc-mod-updater",
+  "script": {
+    "entry": "mc_mod_updater/mod_updater.py",
+    "interpreter": "venv",
+    "cwd": "mc_mod_updater"
+  },
+  "params": [
+    {
+      "name": "action",
+      "label": "动作",
+      "type": "select",
+      "default": "scan",
+      "flag": "--action",
+      "options": ["scan", "check", "update", "deps", "install-deps", "rollback", "dedupe"]
+    },
+    {
+      "name": "modsPath",
+      "label": "mods 文件夹路径",
+      "type": "folder",
+      "default": "",
+      "flag": "--mods-path"
+    },
+    {
+      "name": "mcVersion",
+      "label": "MC 版本",
+      "type": "string",
+      "default": "",
+      "flag": "--mc-version"
+    },
+    {
+      "name": "loader",
+      "label": "加载器",
+      "type": "select",
+      "default": "forge",
+      "flag": "--loader",
+      "options": ["forge", "fabric", "quilt", "neoforge"]
+    },
+    {
+      "name": "backupEnabled",
+      "label": "启用备份",
+      "type": "boolean",
+      "default": true,
+      "flag": "--backup-enabled"
+    },
+    {
+      "name": "backupDir",
+      "label": "备份目录",
+      "type": "string",
+      "default": "mods_backup",
+      "flag": "--backup-dir"
+    },
+    {
+      "name": "concurrency",
+      "label": "并发数",
+      "type": "number",
+      "default": 4,
+      "flag": "--concurrency"
+    },
+    {
+      "name": "timeout",
+      "label": "超时（秒）",
+      "type": "number",
+      "default": 30,
+      "flag": "--timeout"
+    },
+    {
+      "name": "curseforgeApiKey",
+      "label": "CurseForge API Key",
+      "type": "string",
+      "default": "",
+      "flag": "--curseforge-api-key"
+    },
+    {
+      "name": "only",
+      "label": "仅处理指定 jar（逗号分隔）",
+      "type": "string",
+      "default": "",
+      "flag": "--only"
+    },
+    {
+      "name": "apply",
+      "label": "执行删除（排查重复时）",
+      "type": "boolean",
+      "default": false,
+      "flag": "--apply"
+    }
+  ]
+}

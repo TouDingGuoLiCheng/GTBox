@@ -1221,6 +1221,12 @@ fn pick_ascii_media_file() -> Option<String> {
 }
 
 #[tauri::command]
+fn read_workspaces_file(subpath: String) -> Result<String, String> {
+    let path = workspaces_root().join(&subpath);
+    fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {} ({})", path.display(), e))
+}
+
+#[tauri::command]
 fn write_workspaces_file(subpath: String, content: String) -> Result<(), String> {
     let path = workspaces_root().join(&subpath);
     if let Some(parent) = path.parent() {
@@ -1515,6 +1521,7 @@ pub fn run() {
             pick_image_files,
             pick_ascii_media_file,
             copy_file_to_workspaces,
+            read_workspaces_file,
             write_workspaces_file,
             pick_text_file,
             pick_song_list_file,

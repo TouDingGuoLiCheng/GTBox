@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 32,
+    "ingredient": {
+      "item": "youkaishomecoming:cucumber_slice"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_emerald",
+    "count": 1
+  }
+}

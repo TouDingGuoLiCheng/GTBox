@@ -1,0 +1,13 @@
+{
+  "attribute": "shippingbin:crop_sell_multiplier",
+  "input": {
+    "count": 8,
+    "ingredient": {
+      "item": "farmersdelight:brown_mushroom_colony"
+    }
+  },
+  "output": {
+    "item": "lightmanscurrency:coin_emerald",
+    "count": 1
+  }
+}

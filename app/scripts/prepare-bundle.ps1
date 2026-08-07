@@ -115,8 +115,10 @@ function Verify-Bundle {
 
     $required = @(
         "plugins\batch_rename\manifest.json",
+        "plugins\mc_mod_updater\manifest.json",
         "plugins\playlist_ocr\region_ocr.py",
         "workspaces\music_crawl\full_auto_download_2t58.py",
+        "workspaces\mc_mod_updater\mod_updater.py",
         "workspaces\skin-presets\cloud.mp4",
         "workspaces\skin-presets\cloud-bgm.mp3",
         "workspaces\split_pic\main.py"

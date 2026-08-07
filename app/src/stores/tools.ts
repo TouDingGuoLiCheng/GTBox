@@ -15,6 +15,15 @@ const builtInTools: ToolItem[] = [
     customRoute: "/tools/music-crawl",
   },
   {
+    id: "mc_mod_updater",
+    name: "MineCraft模组更新器",
+    description: "扫描本地 mods，检查并更新可用新版本",
+    category: "游戏",
+    icon: "mdi:cube-outline",
+    tags: ["Minecraft", "mod"],
+    customRoute: "/tools/mc-mod-updater",
+  },
+  {
     id: "translate",
     name: "翻译",
     description: "输入文本翻译，支持多引擎与历史记录",

@@ -40,3 +40,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# local runtime state
+mods_state.json
+**/mods_state.json
+
